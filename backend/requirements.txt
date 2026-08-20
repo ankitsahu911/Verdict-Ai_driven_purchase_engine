@@ -1,0 +1,12 @@
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+python-multipart>=0.0.9
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0
+alembic>=1.13.0
+python-dotenv>=1.0.0
+requests>=2.20.0
+firebase-admin>=7.0.0
+cloudinary>=1.36.0
+chromadb>=0.4.0
+google-genai>=1.0.0

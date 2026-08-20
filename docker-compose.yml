@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: verdict-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: verdict
+      POSTGRES_PASSWORD: verdict
+      POSTGRES_DB: verdict
+    ports:
+      - "5432:5432"
+    volumes:
+      - verdict-pgdata:/var/lib/postgresql/data
+
+volumes:
+  verdict-pgdata:
