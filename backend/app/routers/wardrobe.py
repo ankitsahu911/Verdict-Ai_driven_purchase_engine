@@ -20,7 +20,9 @@ from sqlalchemy.orm import Session
 from app.auth import get_current_user
 from app.db import get_db
 from app.models import ExtractionSource, GarmentAttributes, User, WardrobeItem
+from app.services.chroma_service import find_near_duplicate, upsert_wardrobe_embedding
 from app.services.cloudinary_service import upload_image
+from app.services.embedding_service import generate_embedding
 from app.services.vision_service import VisionServiceError, analyze_image
 
 logger = logging.getLogger(__name__)
@@ -135,6 +137,22 @@ async def upload_wardrobe_photos(
                 db.add(item)
                 db.flush()
                 db.refresh(item)
+
+            # Generate CLIP embedding and store in ChromaDB
+            try:
+                embedding = generate_embedding(item.cloudinary_url)
+                upsert_wardrobe_embedding(
+                    item_id=item.id,
+                    user_id=owner.id,
+                    category="unknown",
+                    embedding=embedding,
+                )
+            except Exception as embed_err:
+                logger.warning(
+                    "Embedding generation skipped/failed for item %s: %s",
+                    item.id,
+                    embed_err,
+                )
 
             uploaded.append(
                 {
@@ -386,3 +404,112 @@ async def analyze_wardrobe_item(
         "extraction_source": attrs.extraction_source.value,
         "cached": False,
     }
+
+
+class NearDuplicateCheckRequest(BaseModel):
+    item_id: int | None = None
+    image_url: str | None = None
+
+
+@router.post("/near-duplicate")
+async def check_near_duplicate(
+    payload: NearDuplicateCheckRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Find near-duplicate item in logged-in user's wardrobe by embedding similarity.
+
+    Requires either ``item_id`` or ``image_url`` in request payload.
+    Queries ChromaDB scoped to logged-in user, excluding ``item_id`` if provided.
+    Returns nearest match item details, cloudinary URL, and 0-100% similarity score.
+    """
+    owner = get_or_create_user(db, user["uid"], user["email"])
+
+    image_url: str | None = None
+    exclude_item_id: int | None = None
+
+    if payload.item_id is not None:
+        item = db.query(WardrobeItem).filter(WardrobeItem.id == payload.item_id).first()
+        if item is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Wardrobe item not found",
+            )
+        if item.user_id != owner.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this item",
+            )
+        image_url = item.cloudinary_url
+        exclude_item_id = item.id
+    elif payload.image_url:
+        image_url = payload.image_url
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either item_id or image_url must be provided",
+        )
+
+    try:
+        embedding = generate_embedding(image_url)
+    except Exception as err:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate embedding for near-duplicate check: {err}",
+        ) from err
+
+    result = find_near_duplicate(
+        query_embedding=embedding,
+        user_id=owner.id,
+        exclude_item_id=exclude_item_id,
+    )
+
+    if not result:
+        return {
+            "has_duplicate": False,
+            "match": None,
+        }
+
+    matched_item_id = result["wardrobe_item_id"]
+    matched_item = db.query(WardrobeItem).filter(WardrobeItem.id == matched_item_id).first()
+
+    cloudinary_url = (
+        matched_item.cloudinary_url
+        if matched_item
+        else result.get("metadata", {}).get("cloudinary_url", "")
+    )
+    category = (
+        (matched_item.attributes.category if matched_item and matched_item.attributes else None)
+        or result.get("metadata", {}).get("category")
+        or "item"
+    )
+
+    similarity_pct = result["similarity_percentage"]
+    message = f"{similarity_pct}% similar to a {category} you already own"
+
+    return {
+        "has_duplicate": True,
+        "match": {
+            "wardrobe_item_id": matched_item_id,
+            "cloudinary_url": cloudinary_url,
+            "similarity_percentage": similarity_pct,
+            "distance": result["distance"],
+            "category": category,
+            "message": message,
+        },
+    }
+
+
+@router.get("/{item_id}/near-duplicate")
+async def get_item_near_duplicate(
+    item_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get single nearest neighbor for an existing item among user's other wardrobe items."""
+    return await check_near_duplicate(
+        payload=NearDuplicateCheckRequest(item_id=item_id),
+        user=user,
+        db=db,
+    )
+

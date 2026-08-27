@@ -93,9 +93,32 @@ def _guess_mime(image_url: str) -> str:
 
 
 def _is_rate_limit(e: Exception) -> bool:
-    return getattr(e, "code", None) == 429 or (
-        "RESOURCE_EXHAUSTED" in str(getattr(e, "message", ""))
+    err_str = str(e)
+    return (
+        getattr(e, "code", None) == 429
+        or "429" in err_str
+        or "RESOURCE_EXHAUSTED" in err_str
     )
+
+
+
+def _fetch_image_part(image_url: str):
+    """Fetch image bytes from URL and wrap in Part.from_bytes for Gemini vision."""
+    from google.genai import types
+    mime = _guess_mime(image_url)
+    try:
+        import urllib3
+        urllib3.disable_warnings()
+        import requests
+        resp = requests.get(image_url, timeout=15, verify=False)
+        if resp.status_code == 200 and resp.content:
+            content_type = resp.headers.get("content-type", "").split(";")[0].strip()
+            if content_type and content_type.startswith("image/"):
+                mime = content_type
+            return types.Part.from_bytes(data=resp.content, mime_type=mime)
+    except Exception:
+        pass
+    return types.Part.from_uri(file_uri=image_url, mime_type=mime)
 
 
 def analyze_image(image_url: str) -> dict:
@@ -113,6 +136,8 @@ def analyze_image(image_url: str) -> dict:
 
     from google.genai import types
 
+    image_part = _fetch_image_part(image_url)
+
     response = None
     last_error: Exception | None = None
     for attempt in range(MAX_RATE_LIMIT_RETRIES):
@@ -120,9 +145,7 @@ def analyze_image(image_url: str) -> dict:
             response = client.models.generate_content(
                 model=model,
                 contents=[
-                    types.Part.from_uri(
-                        file_uri=image_url, mime_type=_guess_mime(image_url)
-                    ),
+                    image_part,
                     types.Part.from_text(
                         text="Describe the garment in this photo. Respond with JSON."
                     ),
@@ -170,3 +193,115 @@ def analyze_image(image_url: str) -> dict:
         "season": data["season"],
         "material": data["material"],
     }
+
+
+FIT_SYSTEM_PROMPT = """You are an expert fit and silhouette analyzer for a virtual try-on fashion AI.
+Analyze the rendered try-on image (showing a model/person wearing a garment) and derive three structured fit attributes:
+
+- "fit_tightness": how tightly or loosely the garment fits on the model's body.
+  Must be strictly one of: "tight", "regular", "loose", "oversized".
+- "silhouette": the overall structural shape/cut of the garment on the model.
+  Must be strictly one of: "slim", "tailored", "relaxed", "boxy".
+- "notes": a concise, plain-English observation (1-2 sentences max) describing the fit and silhouette on the body (e.g., "Slightly snug around waist with natural shoulder drape.").
+
+Be objective, concise, and base your analysis directly on the visual fit shown in the try-on render."""
+
+FIT_OUTPUT_SCHEMA = {
+    "type": "OBJECT",
+    "properties": {
+        "fit_tightness": {
+            "type": "STRING",
+            "enum": ["tight", "regular", "loose", "oversized"],
+        },
+        "silhouette": {
+            "type": "STRING",
+            "enum": ["slim", "tailored", "relaxed", "boxy"],
+        },
+        "notes": {"type": "STRING"},
+    },
+    "required": ["fit_tightness", "silhouette", "notes"],
+}
+
+
+def analyze_fit(render_image_url: str) -> dict:
+    """Analyze a virtual try-on render image to derive fit tightness, silhouette, and notes.
+
+    Returns {fit_tightness, silhouette, notes}.
+    Raises VisionServiceError with a clear message on any failure.
+    """
+    if not render_image_url:
+        raise VisionServiceError("No render image URL provided.")
+
+    model = os.getenv("GEMINI_VISION_MODEL", DEFAULT_MODEL)
+    client = _get_client()
+
+    from google.genai import types
+
+    image_part = _fetch_image_part(render_image_url)
+
+    response = None
+    last_error: Exception | None = None
+    for attempt in range(MAX_RATE_LIMIT_RETRIES):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=[
+                    image_part,
+                    types.Part.from_text(
+                        text="Analyze the fit and silhouette of the garment in this try-on render photo. Respond with JSON."
+                    ),
+                ],
+                config=types.GenerateContentConfig(
+                    system_instruction=FIT_SYSTEM_PROMPT,
+                    response_mime_type="application/json",
+                    response_schema=FIT_OUTPUT_SCHEMA,
+                ),
+            )
+            break
+        except Exception as e:
+            last_error = e
+            if _is_rate_limit(e) and attempt < MAX_RATE_LIMIT_RETRIES - 1:
+                time.sleep(2 ** (attempt + 1))
+                continue
+            raise VisionServiceError(f"Gemini fit vision request failed: {e}") from e
+
+    if response is None:
+        raise VisionServiceError(
+            f"Gemini fit vision request failed: {last_error}"
+        ) from last_error
+
+    try:
+        if getattr(response, "parsed", None) is not None:
+            data = dict(response.parsed)
+        else:
+            content = response.text
+            if not content:
+                raise ValueError("empty response body")
+            data = json.loads(content)
+    except (ValueError, KeyError, IndexError, TypeError) as e:
+        raise VisionServiceError(f"Could not parse Gemini fit response: {e}") from e
+
+    required = {"fit_tightness", "silhouette", "notes"}
+    missing = required - set(data)
+    if missing:
+        raise VisionServiceError(f"Gemini fit response missing fields: {sorted(missing)}")
+
+    allowed_tightness = {"tight", "regular", "loose", "oversized"}
+    allowed_silhouette = {"slim", "tailored", "relaxed", "boxy"}
+
+    fit_tightness = str(data.get("fit_tightness", "")).lower()
+    if fit_tightness not in allowed_tightness:
+        fit_tightness = "regular"
+
+    silhouette = str(data.get("silhouette", "")).lower()
+    if silhouette not in allowed_silhouette:
+        silhouette = "tailored"
+
+    notes = str(data.get("notes", ""))
+
+    return {
+        "fit_tightness": fit_tightness,
+        "silhouette": silhouette,
+        "notes": notes,
+    }
+

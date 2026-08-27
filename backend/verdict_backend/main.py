@@ -2,11 +2,13 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import get_current_user
-from app.routers import wardrobe
+from app.routers import candidates, tryon, wardrobe
 
 app = FastAPI(title="Verdict Backend", version="0.1.0")
 
 app.include_router(wardrobe.router)
+app.include_router(tryon.router)
+app.include_router(candidates.router)
 
 app.add_middleware(
     CORSMiddleware,

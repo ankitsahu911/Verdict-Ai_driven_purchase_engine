@@ -112,3 +112,105 @@ export async function patchAttributes(
     body: JSON.stringify(attrs),
   });
 }
+
+export interface NearDuplicateMatch {
+  wardrobe_item_id: number;
+  cloudinary_url: string;
+  similarity_percentage: number;
+  distance: number;
+  category: string;
+  message: string;
+}
+
+export interface NearDuplicateResponse {
+  has_duplicate: boolean;
+  match: NearDuplicateMatch | null;
+}
+
+export async function checkNearDuplicate(
+  req: { item_id?: number; image_url?: string },
+): Promise<NearDuplicateResponse> {
+  return apiFetch("/api/wardrobe/near-duplicate", {
+    method: "POST",
+    body: JSON.stringify(req),
+  });
+}
+
+export interface CandidateTryOnData {
+  render_url: string;
+  fit_tightness: string | null;
+  silhouette: string | null;
+  notes: string | null;
+}
+
+export interface CandidateEvaluationResult {
+  candidate_item_id: number;
+  cloudinary_url: string;
+  attributes: GarmentAttributesData | null;
+  tryon: CandidateTryOnData | null;
+  duplicate: NearDuplicateMatch | null;
+  errors: Record<string, string> | null;
+}
+
+/**
+ * Upload candidate garment photo to POST /api/candidates for full orchestrated evaluation.
+ */
+export function evaluateCandidate(
+  file: File,
+  token: string,
+  onProgress?: (percent: number) => void,
+): Promise<CandidateEvaluationResult> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_URL}/api/candidates`);
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) {
+        onProgress(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as CandidateEvaluationResult);
+        } catch {
+          reject(new Error("Invalid server response"));
+        }
+      } else {
+        try {
+          const errBody = JSON.parse(xhr.responseText);
+          reject(new Error(errBody.detail || `Evaluation failed (HTTP ${xhr.status})`));
+        } catch {
+          reject(new Error(`Evaluation failed (HTTP ${xhr.status})`));
+        }
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network error during candidate evaluation"));
+    xhr.onabort = () => reject(new Error("Evaluation upload aborted"));
+
+    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    const form = new FormData();
+    form.append("file", file, file.name);
+    xhr.send(form);
+  });
+}
+
+export interface OutfitMatchItem {
+  wardrobe_item_id: number;
+  cloudinary_url: string;
+  attributes: GarmentAttributesData | null;
+  matched_because: string[];
+}
+
+export interface OutfitMatchesResponse {
+  candidate_id: number;
+  candidate_attributes: Record<string, string | null>;
+  total_matches: number;
+  matches: OutfitMatchItem[];
+}
+
+export async function fetchOutfitMatches(candidateId: number): Promise<OutfitMatchesResponse> {
+  return apiFetch(`/api/candidates/${candidateId}/outfit-matches`);
+}
