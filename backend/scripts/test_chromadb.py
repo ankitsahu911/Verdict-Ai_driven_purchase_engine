@@ -1,10 +1,3 @@
-"""
-Test ChromaDB connectivity.
-
-Uses PersistentClient by default (data stored under backend/data/).
-If CHROMA_HOST env var is set, connects to that hosted Chroma instance instead.
-"""
-
 import os
 import sys
 import uuid
@@ -31,12 +24,8 @@ else:
     print(f"Using local PersistentClient at {DATA_DIR}")
     client = chromadb.PersistentClient(path=str(DATA_DIR))
 
-# -----------------------------------------------------------------------
-# 2. Get-or-create a test collection (no default embedding function)
-# -----------------------------------------------------------------------
 COLLECTION_NAME = "verdict-test-throwaway"
 
-# Delete if left from a previous run (ignore if missing)
 try:
     client.delete_collection(COLLECTION_NAME)
     print(f"  Deleted leftover collection `{COLLECTION_NAME}`")
@@ -45,12 +34,9 @@ except Exception:
 
 collection = client.create_collection(
     name=COLLECTION_NAME,
-    embedding_function=None,  # we supply raw vectors
+    embedding_function=None,
 )
 
-# -----------------------------------------------------------------------
-# 3. Add one vector with metadata
-# -----------------------------------------------------------------------
 VECTOR_DIM = 4
 doc_id = str(uuid.uuid4())
 
@@ -64,10 +50,7 @@ collection.add(
     metadatas=[metadata],
 )
 
-# -----------------------------------------------------------------------
-# 4. Query – nearest neighbour (should match the vector we just added)
-# -----------------------------------------------------------------------
-query_vector = [0.15, 0.25, 0.35, 0.45]  # close to [0.1, 0.2, 0.3, 0.4]
+query_vector = [0.15, 0.25, 0.35, 0.45]
 
 results = collection.query(query_embeddings=[query_vector], n_results=1)
 
@@ -82,7 +65,6 @@ print(f"  Metadata:          {matched_metadata}")
 assert matched_id == doc_id, f"Expected match on {doc_id}, got {matched_id}"
 print("  Match verified")
 
-# Cleanup
 client.delete_collection(COLLECTION_NAME)
 print(f"  Cleaned up collection `{COLLECTION_NAME}`")
 

@@ -1,13 +1,3 @@
-"""
-Nearest-Neighbor Verification Script for CLIP Embeddings (MILESTONE 12).
-
-Takes a target wardrobe item ID (or selects the first item in the DB),
-queries ChromaDB for nearest-neighbor vectors, and prints similarity results.
-
-Usage:
-    python scripts/verify_embeddings.py [item_id]
-"""
-
 import json
 import logging
 import os
@@ -34,7 +24,6 @@ logger = logging.getLogger("verify")
 
 
 def verify_embeddings(target_item_id: int | None = None, top_k: int = 5) -> dict:
-    """Run nearest-neighbor query for a target item and print results."""
     db = SessionLocal()
     try:
         if target_item_id is not None:
@@ -71,7 +60,6 @@ def verify_embeddings(target_item_id: int | None = None, top_k: int = 5) -> dict
         print("Generating/loading vector embedding for target item...")
         query_vector = generate_embedding(target_url)
 
-        # Ensure target item is present in ChromaDB
         upsert_wardrobe_embedding(
             item_id=target_id,
             user_id=target_item.user_id,

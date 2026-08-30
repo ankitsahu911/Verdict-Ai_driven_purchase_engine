@@ -2,13 +2,12 @@
 
 import React, { useState } from "react";
 import { Sparkles, ArrowRight } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { VerdictCard } from "@/components/VerdictCard";
 import type { BuyScoreResultData } from "@/lib/api";
 
-// Preloaded mock demonstration items for immediate visual testing
 const DEMO_ITEMS: Record<string, BuyScoreResultData> = {
   buy: {
     candidate_id: 101,
@@ -198,17 +197,16 @@ export default function VerdictTestPage() {
       <div>
         <div className="flex items-center gap-2 text-primary font-semibold text-sm mb-1">
           <Sparkles className="h-4 w-4" />
-          <span>Milestone 24 Interactive Test Lab</span>
+          <span>Decision Visualizer</span>
         </div>
         <h1 className="text-3xl font-extrabold tracking-tight">
           The Verdict & 6-Axis Radar Visualizer
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Explore the synthesized Buy Score, actionable verdict badge, Recharts radar profile, and 6-axis explanations.
+          Explore the synthesized Buy Score, actionable verdict badge, radar profile, and 6-axis explanations.
         </p>
       </div>
 
-      {/* Control Switcher */}
       <Card className="border shadow-sm">
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -258,7 +256,6 @@ export default function VerdictTestPage() {
         </CardContent>
       </Card>
 
-      {/* Live / Demo Render */}
       {activeCandidateId ? (
         <VerdictCard candidateId={activeCandidateId} />
       ) : selectedDemo && DEMO_ITEMS[selectedDemo] ? (

@@ -1,14 +1,3 @@
-"""
-Test script for Fit Analysis and Try-On Agent (MILESTONE 11).
-
-Tests:
-1. Standalone `analyze_fit(render_image_url)` using Gemini vision.
-2. End-to-end `generate_tryon(garment_url)` incorporating YouCam try-on + fit analysis.
-
-Usage:
-    python scripts/test_fit.py
-"""
-
 import json
 import os
 import sys
@@ -25,7 +14,6 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent / ".env")
 
 
 def test_fit_analysis():
-    print("\n=== 1. Testing Standalone analyze_fit ===")
     sample_render_url = (
         "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f"
     )
@@ -56,7 +44,6 @@ def test_fit_analysis():
 
 
 def test_e2e_tryon_and_fit():
-    print("\n=== 2. Testing End-to-End YouCam Try-On + Fit Analysis ===")
     api_key = os.getenv("YOUCAM_API_KEY")
     garment_url = os.getenv("YOUCAM_REF_URL")
     model_url = os.getenv("YOUCAM_SRC_URL")
@@ -92,7 +79,7 @@ if __name__ == "__main__":
     ok1 = test_fit_analysis()
     ok2 = test_e2e_tryon_and_fit()
     if ok1 and ok2:
-        print("\nAll Milestone 11 tests PASSED!")
+        print("\nAll fit tests PASSED!")
         sys.exit(0)
     else:
         print("\nSome tests FAILED.")

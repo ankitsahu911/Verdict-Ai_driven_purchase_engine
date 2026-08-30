@@ -1,17 +1,3 @@
-"""
-Verify the v1 database schema exists and works (MILESTONE 5).
-
-Checks:
-  1. Connect to Postgres (DATABASE_URL from .env)
-  2. All 4 business tables exist (users, wardrobe_items, garment_attributes,
-     decision_logs) — alembic_version is expected too
-  3. Each table has the expected columns and key constraints
-  4. A round-trip insert + relationship walk works, then cleans up after itself
-
-Usage:
-  python scripts/test_schema.py
-"""
-
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -80,29 +66,18 @@ EXPECTED_FKS = {
     },
 }
 
-# ---------------------------------------------------------------------------
-#  Step 1 – Tables exist
-# ---------------------------------------------------------------------------
-print("=== Step 1: Connect and list tables ===")
 insp = inspect(engine)
 tables = set(insp.get_table_names())
-print(f"  Tables in DB: {sorted(tables)}")
-
 missing = EXPECTED_TABLES - tables
 if missing:
-    print(f"  FAILED — missing tables: {sorted(missing)}")
+    print(f"FAILED — missing tables: {sorted(missing)}")
     sys.exit(1)
-print(f"  All {len(EXPECTED_TABLES)} expected tables present")
 
-# ---------------------------------------------------------------------------
-#  Step 2 – Columns and constraints
-# ---------------------------------------------------------------------------
-print("\n=== Step 2: Columns + constraints ===")
 for table in sorted(EXPECTED_TABLES):
     cols = {c["name"] for c in insp.get_columns(table)}
     missing_cols = EXPECTED_COLUMNS[table] - cols
     if missing_cols:
-        print(f"  FAILED — {table} missing columns: {sorted(missing_cols)}")
+        print(f"FAILED — {table} missing columns: {sorted(missing_cols)}")
         sys.exit(1)
 
     fk_set = {
@@ -114,31 +89,17 @@ for table in sorted(EXPECTED_TABLES):
     if fk_set != expected_fks:
         got = sorted(fk_set)
         want = sorted(expected_fks)
-        print(f"  FAILED — {table} FKs: got {got}, want {want}")
+        print(f"FAILED — {table} FKs: got {got}, want {want}")
         sys.exit(1)
 
-    unique_ids = [
-        u["column_names"]
-        for u in insp.get_unique_constraints(table)
-        if "id" not in u["column_names"] or u["name"] == "uq_garment_attributes_item"
-    ]
-    print(f"  OK — {table}: columns={sorted(cols)}")
-    print(f"      FKs={sorted(fk_set)} uniques={unique_ids}")
-
-# garment_attributes must enforce one-to-one via unique constraint
 ga_uniques = {
     tuple(sorted(u["column_names"]))
     for u in insp.get_unique_constraints("garment_attributes")
 }
 if ("wardrobe_item_id",) not in ga_uniques:
-    print("  FAILED — garment_attributes missing unique constraint on wardrobe_item_id")
+    print("FAILED — garment_attributes missing unique constraint on wardrobe_item_id")
     sys.exit(1)
-print("  OK — garment_attributes unique on wardrobe_item_id (one-to-one enforced)")
 
-# ---------------------------------------------------------------------------
-#  Step 3 – Round-trip insert + relationship walk
-# ---------------------------------------------------------------------------
-print("\n=== Step 3: Round-trip insert ===")
 db = SessionLocal()
 now = datetime.now(timezone.utc)
 test_uid = f"schema-test-{uuid.uuid4()}"
@@ -186,8 +147,6 @@ try:
     assert item.attributes.color == "navy"
     assert item.attributes.extraction_source == ExtractionSource.AI
     assert log.raw_payload["axes"]["fit"] == 0.9
-    print("  Relationships OK (user->items, user->logs, item->attributes, log FK)")
-    print("  Round-trip PASSED")
 finally:
     if user and user.id:
         db.query(DecisionLog).filter(DecisionLog.user_id == user.id).delete()

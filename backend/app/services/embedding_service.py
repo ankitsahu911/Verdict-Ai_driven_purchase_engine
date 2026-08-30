@@ -1,11 +1,3 @@
-"""
-Embedding Service (MILESTONE 12).
-
-Generates 512-dimensional normalized image embedding vectors locally via
-Hugging Face `transformers` CLIP model (`openai/clip-vit-base-patch32`).
-Runs on CPU without external API key or billing dependencies.
-"""
-
 import io
 import logging
 import os
@@ -21,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingServiceError(RuntimeError):
-    """Raised when image embedding generation fails."""
+    pass
 
 
 DEFAULT_CLIP_MODEL = "openai/clip-vit-base-patch32"
@@ -31,11 +23,9 @@ _model = None
 
 
 def _get_model_and_processor():
-    """Lazily load and cache the CLIP model and processor on CPU."""
     global _processor, _model
     if _processor is None or _model is None:
         model_name = os.getenv("CLIP_MODEL_NAME", DEFAULT_CLIP_MODEL)
-        logger.info("Loading local CLIP model on CPU: %s", model_name)
         try:
             import torch
             from transformers import CLIPModel, CLIPProcessor
@@ -51,19 +41,11 @@ def _get_model_and_processor():
 
 
 def generate_embedding(image_url_or_path: str) -> list[float]:
-    """Generate a normalized 512-dimensional CLIP embedding vector for an image.
-
-    Accepts an HTTP/HTTPS image URL or a local file path.
-    Returns a Python list of 512 float values.
-    Raises EmbeddingServiceError on any image load or model inference failure.
-    """
     if not image_url_or_path:
         raise EmbeddingServiceError("No image URL or file path provided.")
 
     try:
-        if image_url_or_path.startswith("http://") or image_url_or_path.startswith(
-            "https://"
-        ):
+        if image_url_or_path.startswith("http://") or image_url_or_path.startswith("https://"):
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
             resp = requests.get(image_url_or_path, headers=headers, timeout=15, verify=False)
             resp.raise_for_status()
@@ -86,7 +68,6 @@ def generate_embedding(image_url_or_path: str) -> list[float]:
 
         with torch.no_grad():
             image_features = model.get_image_features(**inputs)
-            # L2 normalize vector
             image_features = image_features / image_features.norm(
                 p=2, dim=-1, keepdim=True
             )

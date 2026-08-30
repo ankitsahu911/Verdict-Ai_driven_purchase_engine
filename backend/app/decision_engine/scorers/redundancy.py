@@ -1,17 +1,3 @@
-"""
-Redundancy Axis Scorer (MILESTONE 20).
-
-Calculates a 0-100 uniqueness score derived from the candidate's persisted
-duplicate similarity percentage.
-
-Inverted Polarity Rule (Milestone 19):
-- Higher score = More unique / non-redundant (favorable to buying).
-- Score = 100.0 - duplicate_similarity_pct.
-- Null duplicate match = 100.0 (favorable / highly unique).
-
-Source Agent: duplicate_detection
-"""
-
 import logging
 from sqlalchemy.orm import Session
 
@@ -22,15 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 def score_redundancy(candidate_item_id: int, db: Session) -> AxisScore:
-    """Evaluate redundancy (uniqueness) score for a candidate item.
-
-    Args:
-        candidate_item_id: Primary key of candidate WardrobeItem.
-        db: Active SQLAlchemy database session.
-
-    Returns:
-        AxisScore adhering to Milestone 19 contract.
-    """
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_item_id).first()
     if candidate is None:
         return AxisScore(
@@ -55,7 +32,6 @@ def score_redundancy(candidate_item_id: int, db: Session) -> AxisScore:
             },
         )
 
-    # Inverted polarity calculation: higher = more unique / less redundant
     uniqueness_score = round(max(0.0, min(100.0, 100.0 - float(sim_pct))), 1)
 
     if sim_pct >= 85.0:

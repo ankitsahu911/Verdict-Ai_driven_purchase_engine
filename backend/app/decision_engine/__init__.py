@@ -1,10 +1,3 @@
-"""
-Verdict Decision Engine Package.
-
-Provides shared schema contracts, polarity normalization rules, and protocol
-interfaces for all decision axis scorers.
-"""
-
 from app.decision_engine.interface import AxisScorer
 from app.decision_engine.orchestrator import (
     BUY_THRESHOLD,
@@ -30,4 +23,3 @@ __all__ = [
     "BUY_THRESHOLD",
     "CONSIDER_THRESHOLD",
 ]
-

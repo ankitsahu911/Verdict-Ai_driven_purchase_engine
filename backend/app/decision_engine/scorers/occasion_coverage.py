@@ -1,12 +1,3 @@
-"""
-Occasion Coverage Axis Scorer (MILESTONE 22).
-
-Evaluates whether a candidate garment fills an occasion coverage gap in the user's
-wardrobe by rewarding styles/occasions that are rare or underrepresented.
-
-Source Agent: occasion_analysis
-"""
-
 import logging
 from sqlalchemy.orm import Session
 
@@ -18,15 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 def score_occasion_coverage(candidate_item_id: int, db: Session) -> AxisScore:
-    """Evaluate occasion coverage score for a candidate wardrobe item.
-
-    Args:
-        candidate_item_id: Database primary key of candidate WardrobeItem.
-        db: Active SQLAlchemy database session.
-
-    Returns:
-        AxisScore conforming to the Milestone 19 schema.
-    """
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_item_id).first()
     if candidate is None:
         return AxisScore(
@@ -49,7 +31,6 @@ def score_occasion_coverage(candidate_item_id: int, db: Session) -> AxisScore:
         exclude_item_id=candidate_item_id,
     )
 
-    # Empty wardrobe fallback: neutral score
     if not distribution:
         return AxisScore(
             axis=DecisionAxis.OCCASION_COVERAGE,

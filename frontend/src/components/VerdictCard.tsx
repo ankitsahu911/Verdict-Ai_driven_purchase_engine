@@ -16,22 +16,17 @@ import {
   AlertCircle,
   XCircle,
   Sparkles,
-  TrendingUp,
   ShieldAlert,
   Loader2,
-  Info,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
   fetchCandidateBuyScore,
   type BuyScoreResultData,
-  type AxisScoreData,
-  type DecisionAxis,
 } from "@/lib/api";
 
-// Human-friendly axis label mapping
 export const AXIS_META: Record<
   string,
   { label: string; description: string; iconColor: string }
@@ -169,7 +164,6 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
   const config = VERDICT_CONFIG[verdictKey];
   const VerdictIcon = config.icon;
 
-  // Prepare radar chart data with human-friendly labels
   const radarData = (data.axes || []).map((axisItem) => {
     const meta = AXIS_META[axisItem.axis] || { label: axisItem.axis };
     return {
@@ -188,10 +182,8 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
       className={className}
     >
       <Card className={`overflow-hidden shadow-lg border-2 ${config.accentBorder}`}>
-        {/* Top Header & Verdict Banner */}
         <div className={`p-6 bg-gradient-to-br ${config.bgGradient} border-b`}>
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            {/* Verdict Badge & Score Display */}
             <div className="flex items-center gap-4">
               <div
                 className={`flex items-center justify-center h-16 w-16 rounded-2xl border-2 shadow-sm ${config.badgeClass}`}
@@ -212,7 +204,6 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
               </div>
             </div>
 
-            {/* Overall Buy Score Meter Pill */}
             <div className="w-full md:w-auto md:text-right bg-background/80 backdrop-blur-sm px-4 py-2 rounded-xl border">
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Overall Buy Score
@@ -224,7 +215,6 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
             </div>
           </div>
 
-          {/* Headline Reason (Front and Center) */}
           <div className="mt-4 p-3.5 bg-background/90 backdrop-blur-md rounded-xl border border-border shadow-sm flex items-start gap-3">
             <Sparkles className="h-5 w-5 text-primary shrink-0 mt-0.5" />
             <div>
@@ -240,7 +230,6 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
 
         <CardContent className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Left Column: Recharts Radar Visualization (5 Cols) */}
             <div className="lg:col-span-5 flex flex-col items-center justify-center p-2 rounded-2xl bg-muted/20 border">
               <div className="w-full text-center pb-1">
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -296,7 +285,6 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
               </p>
             </div>
 
-            {/* Right Column: 6-Axis Explanatory Breakdown (7 Cols) */}
             <div className="lg:col-span-7 space-y-3">
               <div className="flex items-center justify-between pb-1 border-b">
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -349,13 +337,11 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
                         </div>
                       </div>
 
-                      {/* Progress Bar */}
                       <Progress
                         value={axisItem.score}
                         className="h-1.5 mb-2 bg-muted"
                       />
 
-                      {/* Explanation String */}
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         {axisItem.reason}
                       </p>

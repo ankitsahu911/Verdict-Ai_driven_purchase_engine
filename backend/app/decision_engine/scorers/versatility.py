@@ -1,12 +1,3 @@
-"""
-Versatility Axis Scorer (MILESTONE 20).
-
-Calculates a 0-100 versatility score based on how many complete outfit
-combinations the candidate garment pairs into with existing wardrobe items.
-
-Source Agent: outfit_composition
-"""
-
 import logging
 from sqlalchemy.orm import Session
 
@@ -16,20 +7,10 @@ from app.services.outfit_service import build_ranked_outfit_combinations
 
 logger = logging.getLogger(__name__)
 
-# Maximum combinations cap for 100% versatility score
 MAX_VERSATILITY_CAP = 5.0
 
 
 def score_versatility(candidate_item_id: int, db: Session) -> AxisScore:
-    """Evaluate versatility score for a candidate item.
-
-    Args:
-        candidate_item_id: Primary key of candidate WardrobeItem.
-        db: Active SQLAlchemy database session.
-
-    Returns:
-        AxisScore adhering to Milestone 19 contract.
-    """
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_item_id).first()
     if candidate is None:
         return AxisScore(
@@ -58,7 +39,6 @@ def score_versatility(candidate_item_id: int, db: Session) -> AxisScore:
         ),
     }
 
-    # Fetch user's non-candidate wardrobe items
     existing_items = (
         db.query(WardrobeItem)
         .filter(

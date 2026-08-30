@@ -1,17 +1,7 @@
-"""
-Candidate Evaluation Orchestration Router (MILESTONE 14).
-
-POST /api/candidates
-Chains Vision Agent, Try-On Agent, Embedding Agent, and Duplicate Detection
-into a single orchestrated endpoint with per-section graceful error handling.
-"""
-
 import logging
 import os
-import tempfile
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
@@ -19,7 +9,6 @@ from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
 from app.db import get_db
-from app.models import ExtractionSource, GarmentAttributes, User, WardrobeItem
 from app.decision_engine.orchestrator import synthesize_buy_score
 from app.decision_engine.scorers import (
     score_budget_impact,
@@ -29,6 +18,7 @@ from app.decision_engine.scorers import (
     score_style_alignment,
     score_versatility,
 )
+from app.models import ExtractionSource, GarmentAttributes, WardrobeItem
 from app.routers.wardrobe import _file_is_allowed, _stream_to_temp, get_or_create_user
 from app.services.chroma_service import find_near_duplicate, upsert_wardrobe_embedding
 from app.services.cloudinary_service import upload_image
@@ -41,8 +31,8 @@ from app.services.outfit_service import (
     build_ranked_outfit_combinations,
     find_compatible_items,
 )
-from app.services.tryon_service import TryOnServiceError, generate_tryon
-from app.services.vision_service import VisionServiceError, analyze_image
+from app.services.tryon_service import generate_tryon
+from app.services.vision_service import analyze_image
 
 logger = logging.getLogger(__name__)
 
@@ -56,16 +46,6 @@ async def evaluate_candidate_item(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Upload a candidate garment image and run full evaluation in one flow.
-
-    Execution Steps:
-    1. Upload image to Cloudinary & create WardrobeItem(is_candidate=True).
-    2. Vision Agent: Extract 6 garment attributes & save GarmentAttributes.
-    3. Try-On Agent: Virtual try-on render + fit signal analysis.
-    4. Embedding Agent: Generate CLIP vector & store in ChromaDB.
-    5. Duplicate Detection: Query ChromaDB for nearest non-candidate wardrobe match.
-    6. Persist all computed evaluation fields onto the WardrobeItem DB row.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
     filename = file.filename or "candidate.jpg"
 
@@ -88,7 +68,6 @@ async def evaluate_candidate_item(
             except (ValueError, TypeError):
                 parsed_price = None
 
-        # Step 1: Create WardrobeItem row with is_candidate=True and optional price
         candidate_item = WardrobeItem(
             user_id=owner.id,
             cloudinary_url=cloud["url"],
@@ -123,11 +102,8 @@ async def evaluate_candidate_item(
     embedding: list[float] | None = None
     errors: dict[str, str] = {}
 
-    # Step 2: Vision Agent Analysis
     try:
-        logger.info("M14 Step 2 [Vision] Analyzing candidate item %s", item_id)
         extracted = analyze_image(image_url)
-
         now = datetime.now(timezone.utc)
         attrs = GarmentAttributes(
             wardrobe_item_id=item_id,
@@ -152,12 +128,10 @@ async def evaluate_candidate_item(
             "material": attrs.material,
         }
     except Exception as err:
-        logger.warning("M14 Vision step failed for candidate item %s: %s", item_id, err)
+        logger.warning("Vision analysis failed for candidate item %s: %s", item_id, err)
         errors["attributes"] = str(err)
 
-    # Step 3: Virtual Try-On & Fit Signal Analysis
     try:
-        logger.info("M14 Step 3 [Try-On] Generating virtual try-on for candidate item %s", item_id)
         category = attributes_res.get("category") if attributes_res else None
         tryon_res = generate_tryon(
             garment_url=image_url,
@@ -168,12 +142,10 @@ async def evaluate_candidate_item(
             candidate_item.fit_tightness = tryon_res.get("fit_tightness")
             candidate_item.silhouette = tryon_res.get("silhouette")
     except Exception as err:
-        logger.warning("M14 Try-On step failed for candidate item %s: %s", item_id, err)
+        logger.warning("Try-on step failed for candidate item %s: %s", item_id, err)
         errors["tryon"] = str(err)
 
-    # Step 4: Local CLIP Embedding Generation & ChromaDB Storage
     try:
-        logger.info("M14 Step 4 [Embedding] Generating CLIP vector for candidate item %s", item_id)
         embedding = generate_embedding(image_url)
         category_str = (attributes_res.get("category") if attributes_res else None) or "unknown"
         upsert_wardrobe_embedding(
@@ -183,13 +155,11 @@ async def evaluate_candidate_item(
             embedding=embedding,
         )
     except Exception as err:
-        logger.warning("M14 Embedding step failed for candidate item %s: %s", item_id, err)
+        logger.warning("Embedding generation failed for candidate item %s: %s", item_id, err)
         errors["embedding"] = str(err)
 
-    # Step 5: Duplicate Detection
     if embedding:
         try:
-            logger.info("M14 Step 5 [Duplicate] Querying near-duplicates for candidate item %s", item_id)
             near_dup = find_near_duplicate(
                 query_embedding=embedding,
                 user_id=owner.id,
@@ -223,7 +193,7 @@ async def evaluate_candidate_item(
                     "message": f"{pct}% similar to a {matched_category} you already own",
                 }
         except Exception as err:
-            logger.warning("M14 Duplicate detection step failed for candidate item %s: %s", item_id, err)
+            logger.warning("Duplicate detection failed for candidate item %s: %s", item_id, err)
             errors["duplicate"] = str(err)
 
     db.commit()
@@ -245,12 +215,6 @@ async def get_candidate_outfit_matches(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Return rule-based outfit matches for a candidate garment from user's existing wardrobe.
-
-    Enforces ownership check. Queries user's non-candidate wardrobe items (is_candidate = False)
-    and evaluates classical category compatibility & color harmony rules.
-    Each returned match includes a `matched_because` array detailing the exact rules applied.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_id).first()
@@ -275,7 +239,6 @@ async def get_candidate_outfit_matches(
         "material": attrs.material if attrs else None,
     }
 
-    # Fetch user's non-candidate wardrobe items
     existing_items = (
         db.query(WardrobeItem)
         .filter(
@@ -305,13 +268,6 @@ async def get_candidate_outfit_combinations(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Return top 5 ranked complete outfit combinations for a candidate garment.
-
-    Enforces ownership check on candidate item. Queries user's non-candidate wardrobe items,
-    builds valid multi-piece outfit combinations (candidate + required garment slots),
-    enforces full pairwise compatibility (category, color, season, style/occasion),
-    scores combinations, and returns top 5 with templated reason summaries and matched rules.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_id).first()
@@ -344,7 +300,6 @@ async def get_candidate_outfit_combinations(
         ),
     }
 
-    # Fetch user's non-candidate wardrobe items
     existing_items = (
         db.query(WardrobeItem)
         .filter(
@@ -379,10 +334,6 @@ async def update_candidate_price(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Set or update purchase price for a candidate garment.
-
-    Protected and ownership-checked. Returns updated candidate price payload.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_id).first()
@@ -419,13 +370,6 @@ async def get_candidate_economics(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Calculate cost-per-wear economics for a candidate garment.
-
-    Protected and ownership-checked.
-    Requires `price` to be set on candidate item (returns HTTP 400 if missing).
-    Calculates CPW traceably as `price / baseline_wears_used`.
-    Placeholder `return_risk` is explicitly set to null (populated in M18).
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_id).first()
@@ -484,11 +428,6 @@ async def get_candidate_axis_scores(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Evaluate and return implemented decision axis scores for a candidate item.
-
-    Protected and ownership-checked.
-    Returns an extensible list of AxisScore objects (currently versatility and redundancy).
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_id).first()
@@ -503,7 +442,6 @@ async def get_candidate_axis_scores(
             detail="You don't have access to this candidate item",
         )
 
-    # Evaluate all 6 implemented axis scorers
     v_score = score_versatility(candidate_id, db)
     r_score = score_redundancy(candidate_id, db)
     s_score = score_seasonal_relevance(candidate_id, db)
@@ -533,12 +471,6 @@ async def get_candidate_buy_score(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Synthesize all 6 decision axes into a unified Buy Score and actionable verdict.
-
-    Protected and ownership-checked.
-    Generates a deterministic Buy Score (0-100), actionable verdict ('buy', 'consider', 'skip'),
-    headline reason summary, and persists the result to `decision_logs`.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_id).first()
@@ -553,7 +485,6 @@ async def get_candidate_buy_score(
             detail="You don't have access to this candidate item",
         )
 
-    # Synthesize verdict deterministically and persist to decision_logs
     result = synthesize_buy_score(
         candidate_item_id=candidate_id,
         db=db,
@@ -561,10 +492,3 @@ async def get_candidate_buy_score(
     )
 
     return result.model_dump()
-
-
-
-
-
-
-

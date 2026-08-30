@@ -1,13 +1,3 @@
-"""
-Economics Agent Service (MILESTONES 17 + 18).
-
-Provides category-level baseline wear division calculations (Cost-Per-Wear)
-and combines category return baselines with fit tightness signals into a
-deterministic return-risk score (0-100 range) with templated reasoning.
-
-NO LLM calls are used in this module.
-"""
-
 import json
 import logging
 from pathlib import Path
@@ -15,7 +5,6 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Fallback category baselines: (annual_wears, baseline_return_risk, typical_cost_per_wear_ceiling)
 DEFAULT_CATEGORY_BASELINES: dict[str, dict[str, Any]] = {
     "top": {"annual_wears": 30, "baseline_return_risk": 20, "typical_cost_per_wear_ceiling": 3.50},
     "bottom": {"annual_wears": 35, "baseline_return_risk": 30, "typical_cost_per_wear_ceiling": 4.00},
@@ -29,7 +18,6 @@ BASELINES_FILE = Path(__file__).resolve().parent.parent / "data" / "wear_baselin
 
 
 def load_wear_baselines() -> dict[str, dict[str, Any]]:
-    """Load category wear, return-risk, and CPW ceiling baselines from app/data/wear_baselines.json."""
     if BASELINES_FILE.exists():
         try:
             with open(BASELINES_FILE, "r", encoding="utf-8") as f:
@@ -45,7 +33,6 @@ def load_wear_baselines() -> dict[str, dict[str, Any]]:
                             "typical_cost_per_wear_ceiling": float(v.get("typical_cost_per_wear_ceiling", fallback_data.get("typical_cost_per_wear_ceiling", 3.50))),
                         }
                     else:
-                        # Fallback for int values
                         fallback_data = DEFAULT_CATEGORY_BASELINES.get(key, {})
                         result[key] = {
                             "annual_wears": int(v),
@@ -59,7 +46,6 @@ def load_wear_baselines() -> dict[str, dict[str, Any]]:
 
 
 def normalize_category_key(raw_category: str | None) -> str:
-    """Map raw garment category to baseline key."""
     if not raw_category:
         return "top"
     cleaned = raw_category.strip().lower()
@@ -81,20 +67,6 @@ def normalize_category_key(raw_category: str | None) -> str:
 
 
 def calculate_cost_per_wear(category: str | None, price: float) -> dict:
-    """Calculate cost-per-wear using deterministic division: price / baseline_wears.
-
-    Args:
-        category: Garment category (e.g. "top", "jeans", "shoes").
-        price: Item purchase price in currency units.
-
-    Returns:
-        {
-            "cost_per_wear": float,
-            "baseline_wears_used": int,
-            "category": str,
-            "price": float
-        }
-    """
     if price is None or price <= 0:
         raise ValueError("Price must be a positive number to calculate cost-per-wear.")
 
@@ -114,14 +86,6 @@ def calculate_cost_per_wear(category: str | None, price: float) -> dict:
 
 
 def normalize_fit_tightness(fit_tightness: str | None) -> tuple[str, int, str]:
-    """Normalize fit tightness string into (normalized_fit, adjustment_delta, description).
-
-    Rules:
-    - tight / too tight / snug -> (+25, "tight fit")
-    - oversized / loose / baggy -> (+15, "oversized fit")
-    - regular / relaxed / perfect / true to size -> (-5, "regular/relaxed fit")
-    - None / unknown -> (+0, "unspecified fit")
-    """
     if not fit_tightness:
         return "unspecified", 0, "unspecified fit"
 
@@ -137,21 +101,6 @@ def normalize_fit_tightness(fit_tightness: str | None) -> tuple[str, int, str]:
 
 
 def calculate_return_risk(category: str | None, fit_tightness: str | None) -> dict:
-    """Calculate deterministic return-risk score (0-100 scale) combining category baseline and fit tightness.
-
-    Args:
-        category: Garment category string.
-        fit_tightness: Candidate fit tightness string (e.g. "tight", "regular", "oversized").
-
-    Returns:
-        {
-            "return_risk_score": int,
-            "baseline_risk": int,
-            "fit_adjustment": int,
-            "fit_tightness": str,
-            "reasoning": str
-        }
-    """
     baselines = load_wear_baselines()
     cat_key = normalize_category_key(category)
     cat_data = baselines.get(cat_key, baselines.get("top", {"baseline_return_risk": 20}))
@@ -162,7 +111,6 @@ def calculate_return_risk(category: str | None, fit_tightness: str | None) -> di
     raw_score = baseline_risk + fit_adj
     capped_score = max(0, min(100, raw_score))
 
-    # Generate templated reasoning string without LLM calls
     if fit_adj > 0:
         reasoning = (
             f"{fit_desc.capitalize()} (+{fit_adj}%) on a {cat_key} with an already-elevated baseline return risk "

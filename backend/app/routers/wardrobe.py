@@ -1,10 +1,3 @@
-"""
-Wardrobe routes: upload (M6) and attribute extraction (M7/M8).
-
-Pixels in via multipart/form-data, rows out in Postgres. Vision Agent
-extracts 6 attributes per item and caches results in the DB.
-"""
-
 import logging
 import os
 import tempfile
@@ -35,7 +28,6 @@ CHUNK_SIZE = 1024 * 1024
 
 
 def get_or_create_user(db: Session, uid: str, email: str) -> User:
-    """Find the user by Firebase UID, creating a `users` row on first login."""
     user = db.query(User).filter(User.firebase_uid == uid).first()
     if user is None:
         user = User(
@@ -56,10 +48,6 @@ def _file_is_allowed(content_type: str, filename: str) -> bool:
 
 
 def _stream_to_temp(upload: UploadFile) -> tuple[str, int]:
-    """Write the uploaded file to a temp file, enforcing the size limit.
-
-    Returns (temp_path, byte_count). Raises ValueError if over the limit.
-    """
     suffix = Path(upload.filename or "upload").suffix or ".jpg"
     tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
     tmp_path = tmp.name
@@ -94,51 +82,38 @@ async def upload_wardrobe_photos(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Upload one or more photos to Cloudinary and record them as wardrobe items.
-
-    Each file is handled independently: a failing file is skipped and reported
-    in `failed` rather than aborting the batch.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
-    uploaded: list[dict] = []
+    successful: list[dict] = []
     failed: list[dict] = []
 
-    for upload in files:
-        filename = upload.filename or "unnamed"
+    for file in files:
+        filename = file.filename or "unknown.jpg"
+        content_type = file.content_type or ""
 
-        if not _file_is_allowed(upload.content_type or "", filename):
-            failed.append(
-                {
-                    "filename": filename,
-                    "error": (
-                        "Unsupported file type. Only JPG, PNG and WebP "
-                        "are allowed."
-                    ),
-                }
-            )
+        if not _file_is_allowed(content_type, filename):
+            failed.append({
+                "filename": filename,
+                "error": "Unsupported file type. Only JPG, PNG, and WebP are allowed.",
+            })
             continue
 
         tmp_path: str | None = None
         try:
-            tmp_path, _size = _stream_to_temp(upload)
-            public_id = f"verdict/{owner.firebase_uid}/{uuid.uuid4().hex}"
+            tmp_path, size_bytes = _stream_to_temp(file)
+            public_id = f"verdict/wardrobe/{owner.firebase_uid}/{uuid.uuid4().hex}"
             cloud = upload_image(tmp_path, public_id=public_id)
 
-            # Savepoint so a failing insert rolls back only this file.
-            with db.begin_nested():
-                item = WardrobeItem(
-                    user_id=owner.id,
-                    cloudinary_url=cloud["url"],
-                    cloudinary_public_id=cloud["public_id"],
-                    is_candidate=False,
-                    uploaded_at=datetime.now(timezone.utc),
-                )
-                db.add(item)
-                db.flush()
-                db.refresh(item)
+            item = WardrobeItem(
+                user_id=owner.id,
+                cloudinary_url=cloud["url"],
+                cloudinary_public_id=cloud["public_id"],
+                uploaded_at=datetime.now(timezone.utc),
+            )
+            db.add(item)
+            db.commit()
+            db.refresh(item)
 
-            # Generate CLIP embedding and store in ChromaDB
             try:
                 embedding = generate_embedding(item.cloudinary_url)
                 upsert_wardrobe_embedding(
@@ -147,23 +122,27 @@ async def upload_wardrobe_photos(
                     category="unknown",
                     embedding=embedding,
                 )
-            except Exception as embed_err:
+            except Exception as emb_err:
                 logger.warning(
-                    "Embedding generation skipped/failed for item %s: %s",
+                    "Background embedding generation failed for item %s: %s",
                     item.id,
-                    embed_err,
+                    emb_err,
                 )
 
-            uploaded.append(
-                {
-                    "id": item.id,
-                    "filename": filename,
-                    "url": item.cloudinary_url,
-                    "public_id": item.cloudinary_public_id,
-                }
-            )
-        except Exception as e:
-            failed.append({"filename": filename, "error": str(e)})
+            successful.append({
+                "id": item.id,
+                "filename": filename,
+                "cloudinary_url": item.cloudinary_url,
+                "cloudinary_public_id": item.cloudinary_public_id,
+                "uploaded_at": item.uploaded_at.isoformat(),
+                "size_bytes": size_bytes,
+            })
+        except Exception as err:
+            logger.error("Failed uploading %s: %s", filename, err)
+            failed.append({
+                "filename": filename,
+                "error": str(err),
+            })
         finally:
             if tmp_path:
                 try:
@@ -171,151 +150,66 @@ async def upload_wardrobe_photos(
                 except OSError:
                     pass
 
-    db.commit()
-
-    return {"uploaded": uploaded, "failed": failed}
-
-
-_EXTRACTED_FIELDS = ("category", "color", "pattern", "style", "season", "material")
-
-
-class AttributeUpdate(BaseModel):
-    category: str | None = None
-    color: str | None = None
-    pattern: str | None = None
-    style: str | None = None
-    season: str | None = None
-    material: str | None = None
-
-
-def _serialize_item(item: WardrobeItem) -> dict:
-    """Serialize a wardrobe item with its attributes for the grid view."""
-    attrs = item.attributes
     return {
-        "id": item.id,
-        "cloudinary_url": item.cloudinary_url,
-        "uploaded_at": item.uploaded_at.isoformat(),
-        "attributes": (
-            {
-                "category": attrs.category,
-                "color": attrs.color,
-                "pattern": attrs.pattern,
-                "style": attrs.style,
-                "season": attrs.season,
-                "material": attrs.material,
-                "extraction_source": attrs.extraction_source.value
-                if attrs.extraction_source
-                else None,
-            }
-            if attrs
-            else None
-        ),
+        "uploaded_count": len(successful),
+        "failed_count": len(failed),
+        "items": successful,
+        "failed": failed,
     }
 
 
 @router.get("")
 async def list_wardrobe_items(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Return all wardrobe items for the logged-in user with their attributes."""
     owner = get_or_create_user(db, user["uid"], user["email"])
-    items = (
+
+    query = (
         db.query(WardrobeItem)
-        .filter(WardrobeItem.user_id == owner.id)
+        .filter(WardrobeItem.user_id == owner.id, WardrobeItem.is_candidate == False)
         .order_by(WardrobeItem.uploaded_at.desc())
-        .all()
     )
-    return [_serialize_item(it) for it in items]
-
-
-@router.patch("/{item_id}/attributes")
-async def update_attributes(
-    item_id: int,
-    payload: AttributeUpdate,
-    user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Partially update garment attributes for a wardrobe item.
-
-    Ownership is checked — returns 403 if the item doesn't belong to the
-    caller. Sets ``extraction_source = manual_override`` on save.
-    """
-    owner = get_or_create_user(db, user["uid"], user["email"])
-
-    item = db.query(WardrobeItem).filter(WardrobeItem.id == item_id).first()
-    if item is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Wardrobe item not found",
-        )
-    if item.user_id != owner.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have access to this item",
-        )
-
-    updates = payload.model_dump(exclude_unset=True)
-    if not updates:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No attributes provided",
-        )
-
-    now = datetime.now(timezone.utc)
-    attrs = item.attributes
-    if attrs is None:
-        attrs = GarmentAttributes(
-            wardrobe_item_id=item.id,
-            updated_at=now,
-        )
-        db.add(attrs)
-
-    for field in ("category", "color", "pattern", "style", "season", "material"):
-        if field in updates:
-            setattr(attrs, field, updates[field] or None)
-
-    attrs.extraction_source = ExtractionSource.MANUAL_OVERRIDE
-    attrs.updated_at = now
-    db.commit()
-    db.refresh(attrs)
+    total = query.count()
+    items = query.offset((page - 1) * limit).limit(limit).all()
 
     return {
-        "item_id": item.id,
-        "attributes": {
-            "category": attrs.category,
-            "color": attrs.color,
-            "pattern": attrs.pattern,
-            "style": attrs.style,
-            "season": attrs.season,
-            "material": attrs.material,
-            "extraction_source": attrs.extraction_source.value,
-        },
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "items": [
+            {
+                "id": item.id,
+                "cloudinary_url": item.cloudinary_url,
+                "cloudinary_public_id": item.cloudinary_public_id,
+                "uploaded_at": item.uploaded_at.isoformat(),
+                "attributes": (
+                    {
+                        "category": item.attributes.category,
+                        "color": item.attributes.color,
+                        "pattern": item.attributes.pattern,
+                        "style": item.attributes.style,
+                        "season": item.attributes.season,
+                        "material": item.attributes.material,
+                        "extraction_source": item.attributes.extraction_source.value,
+                    }
+                    if item.attributes
+                    else None
+                ),
+            }
+            for item in items
+        ],
     }
 
 
-def _attrs_complete(attrs: GarmentAttributes | None) -> bool:
-    """True when a row exists with extraction_source='ai' and all 6 fields."""
-    if attrs is None or attrs.extraction_source != ExtractionSource.AI:
-        return False
-    return all(getattr(attrs, f) for f in _EXTRACTED_FIELDS)
-
-
-@router.post("/{item_id}/analyze")
-async def analyze_wardrobe_item(
+@router.get("/{item_id}")
+async def get_wardrobe_item(
     item_id: int,
-    force: bool = Query(False, description="Re-run vision even if cached"),
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Extract 6 garment attributes from an item's photo via the vision agent.
-
-    On first call, runs Gemini vision and writes all 6 fields to the
-    garment_attributes row. Subsequent calls return the cached row instantly
-    unless ``?force=true`` is passed.
-
-    Logs whether the request hit the cache or called the vision API.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     item = db.query(WardrobeItem).filter(WardrobeItem.id == item_id).first()
@@ -330,13 +224,78 @@ async def analyze_wardrobe_item(
             detail="You don't have access to this item",
         )
 
-    attrs = item.attributes
+    return {
+        "id": item.id,
+        "cloudinary_url": item.cloudinary_url,
+        "cloudinary_public_id": item.cloudinary_public_id,
+        "uploaded_at": item.uploaded_at.isoformat(),
+        "attributes": (
+            {
+                "category": item.attributes.category,
+                "color": item.attributes.color,
+                "pattern": item.attributes.pattern,
+                "style": item.attributes.style,
+                "season": item.attributes.season,
+                "material": item.attributes.material,
+                "extraction_source": item.attributes.extraction_source.value,
+            }
+            if item.attributes
+            else None
+        ),
+    }
 
-    if not force and _attrs_complete(attrs):
-        logger.info(
-            "CACHE HIT item=%s — all 6 attributes present, skipping vision call",
-            item_id,
+
+@router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_wardrobe_item(
+    item_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    owner = get_or_create_user(db, user["uid"], user["email"])
+
+    item = db.query(WardrobeItem).filter(WardrobeItem.id == item_id).first()
+    if item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wardrobe item not found",
         )
+    if item.user_id != owner.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this item",
+        )
+
+    db.delete(item)
+    db.commit()
+    return None
+
+
+@router.post("/{item_id}/extract-attributes")
+async def extract_attributes_endpoint(
+    item_id: int,
+    force: bool = Query(
+        False,
+        description="Re-run AI extraction even if cached attributes already exist",
+    ),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    owner = get_or_create_user(db, user["uid"], user["email"])
+
+    item = db.query(WardrobeItem).filter(WardrobeItem.id == item_id).first()
+    if item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wardrobe item not found",
+        )
+    if item.user_id != owner.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this item",
+        )
+
+    if item.attributes and not force:
+        attrs = item.attributes
         return {
             "id": attrs.id,
             "wardrobe_item_id": item.id,
@@ -350,21 +309,17 @@ async def analyze_wardrobe_item(
             "cached": True,
         }
 
-    logger.info(
-        "CACHE MISS item=%s force=%s — calling vision API",
-        item_id,
-        force,
-    )
-
     try:
         extracted = analyze_image(item.cloudinary_url)
-    except VisionServiceError as e:
+    except VisionServiceError as err:
+        logger.error("VisionServiceError extracting attributes for item %s: %s", item_id, err)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=str(e),
-        ) from e
+            detail=str(err),
+        ) from err
 
     now = datetime.now(timezone.utc)
+    attrs = item.attributes
 
     if attrs is None:
         attrs = GarmentAttributes(
@@ -417,12 +372,6 @@ async def check_near_duplicate(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Find near-duplicate item in logged-in user's wardrobe by embedding similarity.
-
-    Requires either ``item_id`` or ``image_url`` in request payload.
-    Queries ChromaDB scoped to logged-in user, excluding ``item_id`` if provided.
-    Returns nearest match item details, cloudinary URL, and 0-100% similarity score.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     image_url: str | None = None
@@ -506,10 +455,8 @@ async def get_item_near_duplicate(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get single nearest neighbor for an existing item among user's other wardrobe items."""
     return await check_near_duplicate(
         payload=NearDuplicateCheckRequest(item_id=item_id),
         user=user,
         db=db,
     )
-

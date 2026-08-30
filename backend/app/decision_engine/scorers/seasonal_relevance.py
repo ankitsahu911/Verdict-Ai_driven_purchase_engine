@@ -1,13 +1,3 @@
-"""
-Seasonal Relevance Axis Scorer (MILESTONE 21).
-
-Evaluates how close the current calendar date is to the candidate item's
-season window (e.g. spring, summer, fall, winter, all-season) extracted
-by the Vision Agent.
-
-Source Agent: vision_agent
-"""
-
 import calendar
 from datetime import datetime, timezone
 import logging
@@ -18,7 +8,6 @@ from app.models import WardrobeItem
 
 logger = logging.getLogger(__name__)
 
-# Season to target months mapping (Northern Hemisphere standard)
 SEASON_MONTHS: dict[str, set[int]] = {
     "spring": {3, 4, 5},
     "summer": {6, 7, 8},
@@ -32,7 +21,6 @@ SEASON_MONTHS: dict[str, set[int]] = {
 
 
 def calculate_month_distance(current_month: int, target_months: set[int]) -> int:
-    """Calculate the shortest circular month distance (0 to 6) to any target month."""
     if current_month in target_months:
         return 0
 
@@ -51,16 +39,6 @@ def score_seasonal_relevance(
     db: Session,
     current_month: int | None = None,
 ) -> AxisScore:
-    """Evaluate seasonal relevance score for a candidate wardrobe item.
-
-    Args:
-        candidate_item_id: Database primary key of candidate WardrobeItem.
-        db: Active SQLAlchemy database session.
-        current_month: Optional 1-12 integer override for current month (useful for testing).
-
-    Returns:
-        AxisScore conforming to the Milestone 19 schema.
-    """
     candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_item_id).first()
     if candidate is None:
         return AxisScore(
@@ -80,7 +58,6 @@ def score_seasonal_relevance(
         else None
     )
 
-    # Handle all-season or unspecified season
     if not raw_season or raw_season in {"all-season", "all season", "year-round", "any"}:
         return AxisScore(
             axis=DecisionAxis.SEASONAL_RELEVANCE,
@@ -97,7 +74,6 @@ def score_seasonal_relevance(
 
     target_months = SEASON_MONTHS.get(raw_season)
     if not target_months:
-        # Unknown season string fallback
         return AxisScore(
             axis=DecisionAxis.SEASONAL_RELEVANCE,
             score=70.0,

@@ -1,28 +1,11 @@
-"""
-Manual test harness for the Vision Agent (MILESTONE 7).
-
-Runs attribute extraction across ~10 varied garment photos and prints
-category/color/pattern so you can eyeball correctness. "Correct" here is a
-human judgment call — the goal is >= 8/10 right.
-
-Usage:
-  python scripts/test_vision.py              # analyze the built-in sample set
-  python scripts/test_vision.py <url> ...    # analyze your own photo URLs
-
-To test the full endpoint (auth + DB write) after uploading an item:
-  curl -X POST http://localhost:8000/api/wardrobe/<item_id>/analyze \
-       -H "Authorization: Bearer <firebase-id-token>"
-"""
-
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.services.vision_service import VisionServiceError, analyze_image  # noqa: E402
+from app.services.vision_service import VisionServiceError, analyze_image
 
-# Free-tier Flash models cap around 10 RPM — pace the batch to avoid 429s.
 DELAY_BETWEEN_PHOTOS = 6.5
 
 SAMPLE_PHOTOS = [
@@ -67,7 +50,6 @@ def main() -> int:
 
     print("-" * len(header))
     print(f"\n{len(jobs) - errors}/{len(jobs)} analyzed OK ({errors} errors).")
-    print("Eyeball the rows above — you're looking for >= 8/10 sensible answers.")
     return 0 if errors == 0 else 1
 
 

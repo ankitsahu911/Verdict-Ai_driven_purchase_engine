@@ -1,20 +1,3 @@
-"""
-YouCam AI Clothes Virtual Try-On — de-risking script (MILESTONE 3).
-
-This is a THROWAWAY confidence check, NOT production code. It will be
-replaced by the real Try-On Agent service in milestone 10.
-
-Workflow (confirmed against docs.perfectcorp.com/reference/ai_clothes v3.0):
-  1. Auth via Bearer token (YOUCAM_API_KEY from .env)
-  2. (Optional) Upload images via File API, or pass public URLs directly
-  3. POST /s2s/v2.0/task/cloth-v3  →  get task_id
-  4. Poll GET /s2s/v2.0/task/cloth-v3/{task_id}  until success / error
-  5. Print render URL, save to last_render_url.txt
-
-Usage:
-  python scripts/test_youcam.py
-"""
-
 import json
 import os
 import sys
@@ -28,30 +11,18 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent / ".env")
 
-# ── Configuration ──────────────────────────────────────────────────────
-# You must set YOUCAM_API_KEY in your .env file.
 API_KEY = os.getenv("YOUCAM_API_KEY")
 if not API_KEY:
     print("ERROR: YOUCAM_API_KEY is not set in .env")
     sys.exit(1)
 
-# Base URL from docs.perfectcorp.com/reference/ai_clothes
 BASE_URL = "https://yce-api-01.makeupar.com"
-
-# ── Image sources ──────────────────────────────────────────────────────
-# Replace these with YOUR actual garment + model image URLs, or use local
-# file paths (the script will upload them via the File API automatically).
-#
-# If you keep these as None, the script will skip the try-on step and only
-# validate auth + File API connectivity.
-SRC_IMAGE_URL = os.getenv("YOUCAM_SRC_URL")  # person / model photo
-REF_IMAGE_URL = os.getenv("YOUCAM_REF_URL")  # garment / outfit photo
+SRC_IMAGE_URL = os.getenv("YOUCAM_SRC_URL")
+REF_IMAGE_URL = os.getenv("YOUCAM_REF_URL")
 GARMENT_CATEGORY = os.getenv("YOUCAM_GARMENT_CATEGORY", "full_body")
 
-# Local file fallback — set these to local paths and the script will upload
-# them via the File API before creating the task.
-SRC_IMAGE_PATH = None  # e.g. "C:/Users/you/model.jpg"
-REF_IMAGE_PATH = None  # e.g. "C:/Users/you/garment.jpg"
+SRC_IMAGE_PATH = None
+REF_IMAGE_PATH = None
 
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
@@ -61,13 +32,9 @@ POLL_INTERVAL_SEC = 3
 MAX_POLL_SEC = 120
 
 OUTPUT_FILE = Path(__file__).resolve().parent / "last_render_url.txt"
-
 BASE_URL_V3 = f"{BASE_URL}/s2s/v2.0/task/cloth-v3"
 FILE_API_URL = f"{BASE_URL}/s2s/v2.0/file"
 
-# ---------------------------------------------------------------------------
-#  Step 0 – Validate auth
-# ---------------------------------------------------------------------------
 print("\n=== Step 0: Auth check ===")
 resp = requests.get(
     f"{BASE_URL_V3}/placeholder-nonexistent",
@@ -79,14 +46,10 @@ if resp.status_code in (401, 403):
     print(f"  Response: {resp.text}")
     sys.exit(1)
 elif resp.status_code == 404:
-    # 404 on a fake task_id is expected and means auth is working
     print("  OK — API key accepted (got 404 on fake resource as expected)")
 else:
     print(f"  OK — API key accepted (status {resp.status_code})")
 
-# ---------------------------------------------------------------------------
-#  Step 1 – Upload images (if local paths given)
-# ---------------------------------------------------------------------------
 print("\n=== Step 1: Upload images (if needed) ===")
 
 def upload_file(file_path: str) -> str:
@@ -99,7 +62,6 @@ def upload_file(file_path: str) -> str:
     ext = file_path_obj.suffix.lower()
     content_type = "image/png" if ext == ".png" else "image/jpeg"
 
-    # 1a. Get signed upload URL
     payload = {
         "files": [
             {
@@ -115,7 +77,6 @@ def upload_file(file_path: str) -> str:
     file_id = data["file_id"]
     upload_info = data["requests"][0]
 
-    # 1b. Upload file bytes to the pre-signed URL
     upload_url = upload_info["url"]
     upload_headers = upload_info["headers"]
     with open(file_path, "rb") as f:
@@ -125,7 +86,6 @@ def upload_file(file_path: str) -> str:
     print(f"  Uploaded {file_name} → file_id={file_id[:40]}…")
     return file_id
 
-# Resolve image references
 src_file_id = None
 ref_file_id = None
 
@@ -135,7 +95,6 @@ if SRC_IMAGE_PATH:
 if REF_IMAGE_PATH:
     ref_file_id = upload_file(REF_IMAGE_PATH)
 
-# Decide what we'll pass to the task
 task_payload = {}
 task_payload["garment_category"] = GARMENT_CATEGORY
 
@@ -154,9 +113,6 @@ if "src_file_url" not in task_payload and "src_file_id" not in task_payload:
     print("  Set YOUCAM_SRC_URL and YOUCAM_REF_URL in .env, or define")
     print("  SRC_IMAGE_PATH / REF_IMAGE_PATH at the top of this script.\n")
 
-# ---------------------------------------------------------------------------
-#  Step 2 – Create AI task
-# ---------------------------------------------------------------------------
 print("\n=== Step 2: Create AI task ===")
 print(f"  Payload: {json.dumps(task_payload, indent=4)}")
 
@@ -174,9 +130,6 @@ if task_data.get("status") != 200:
 task_id = task_data["data"]["task_id"]
 print(f"  Task created: {task_id}")
 
-# ---------------------------------------------------------------------------
-#  Step 3 – Poll for result
-# ---------------------------------------------------------------------------
 print(f"\n=== Step 3: Poll for result (polling every {POLL_INTERVAL_SEC}s) ===")
 poll_url = f"{BASE_URL_V3}/{task_id}"
 
@@ -207,9 +160,6 @@ while True:
 
     time.sleep(POLL_INTERVAL_SEC)
 
-# ---------------------------------------------------------------------------
-#  Step 4 – Print result
-# ---------------------------------------------------------------------------
 print("\n=== Step 4: Result ===")
 render_url = result_data.get("results", {}).get("url")
 if not render_url:

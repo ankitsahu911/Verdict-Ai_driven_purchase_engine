@@ -8,8 +8,6 @@ import {
   UserCheck,
   Layers,
   AlertTriangle,
-  CheckCircle2,
-  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,7 +49,6 @@ export function CandidateEvaluator() {
     setResult(null);
     setCurrentStage(1);
 
-    // Staged progress timer updates for UX during multi-step orchestration
     const timer1 = setTimeout(() => setCurrentStage(2), 1500);
     const timer2 = setTimeout(() => setCurrentStage(3), 4000);
     const timer3 = setTimeout(() => setCurrentStage(4), 8000);
@@ -76,7 +73,6 @@ export function CandidateEvaluator() {
 
   return (
     <div className="space-y-6">
-      {/* Upload & Action Card */}
       <Card className="border-primary/20 shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
@@ -103,31 +99,31 @@ export function CandidateEvaluator() {
             <Button
               onClick={handleEvaluate}
               disabled={!file || loading}
-              className="w-full sm:w-auto px-6"
+              className="w-full sm:w-auto px-6 font-semibold"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Evaluating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  Evaluate Candidate
-                </>
-              )}
+              {loading ? "Evaluating..." : "Run Evaluation"}
             </Button>
           </div>
 
-          {/* Staged Loading State Indicator */}
+          {previewUrl && !result && (
+            <div className="relative aspect-video max-h-48 w-full max-w-xs overflow-hidden rounded-md border bg-muted mx-auto">
+              <img
+                src={previewUrl}
+                alt="Selected garment preview"
+                className="h-full w-full object-contain"
+              />
+            </div>
+          )}
+
           {loading && (
             <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between text-xs font-semibold text-primary">
-                <span>{STAGES[currentStage - 1].label}</span>
+              <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                <span>Evaluation in progress</span>
                 <span>Stage {currentStage} of 4</span>
               </div>
-              <Progress value={(currentStage / 4) * 100} className="h-2" />
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              <Progress value={currentStage * 25} className="h-2" />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
                 {STAGES.map((s) => {
                   const Icon = s.icon;
                   const isActive = s.id === currentStage;
@@ -161,10 +157,8 @@ export function CandidateEvaluator() {
         </CardContent>
       </Card>
 
-      {/* Orchestrated Single-Screen Evaluation Results */}
       {result && (
         <div className="space-y-6">
-          {/* Header Banner */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b pb-3">
             <div className="flex items-center gap-3">
               <img
@@ -181,12 +175,9 @@ export function CandidateEvaluator() {
             </div>
           </div>
 
-          {/* Milestone 24: Decision Engine Verdict & Recharts 6-Axis Radar Card */}
           <VerdictCard candidateId={result.candidate_item_id} />
 
-          {/* 3 Component Results Grid (Vision, Try-On, Duplicate) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* 1. Garment Attributes Summary Card */}
             <Card className="flex flex-col">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
@@ -216,7 +207,6 @@ export function CandidateEvaluator() {
               </CardContent>
             </Card>
 
-            {/* 2. Virtual Try-On & Fit Signal Card */}
             <Card className="flex flex-col">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
@@ -266,7 +256,6 @@ export function CandidateEvaluator() {
               </CardContent>
             </Card>
 
-            {/* 3. Near-Duplicate Match Card */}
             <Card className="flex flex-col">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">

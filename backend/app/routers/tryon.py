@@ -1,11 +1,3 @@
-"""
-Try-On Agent router (MILESTONES 10 + 11).
-
-POST /api/tryon/{wardrobe_item_id}
-Runs YouCam virtual try-on on a wardrobe item and immediately performs
-structured fit analysis on the resulting render image.
-"""
-
 import logging
 from typing import Optional
 
@@ -43,11 +35,6 @@ async def create_tryon_render(
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Run virtual try-on for a wardrobe item and return render URL with structured fit analysis.
-
-    Validates wardrobe item ownership, calls YouCam virtual try-on, and performs
-    fit analysis pass using Gemini vision on the rendered result.
-    """
     owner = get_or_create_user(db, user["uid"], user["email"])
 
     item = db.query(WardrobeItem).filter(WardrobeItem.id == wardrobe_item_id).first()

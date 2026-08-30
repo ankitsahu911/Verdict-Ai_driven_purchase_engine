@@ -1,10 +1,3 @@
-"""
-Cloudinary upload service.
-
-Reuses the connectivity logic proven in `scripts/test_cloudinary.py`
-(config from env vars, upload via `cloudinary.uploader.upload`).
-"""
-
 import os
 from pathlib import Path
 
@@ -14,11 +7,10 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent.parent / "
 
 
 class CloudinaryConfigError(RuntimeError):
-    """Raised when Cloudinary credentials are missing or incomplete."""
+    pass
 
 
 def configure_cloudinary() -> None:
-    """Read Cloudinary credentials from the environment and configure the SDK."""
     cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME")
     api_key = os.getenv("CLOUDINARY_API_KEY")
     api_secret = os.getenv("CLOUDINARY_API_SECRET")
@@ -40,14 +32,6 @@ def configure_cloudinary() -> None:
 
 
 def upload_image(file_path: str | Path, public_id: str | None = None) -> dict:
-    """
-    Upload an image file to Cloudinary.
-
-    Mirrors the upload call from `scripts/test_cloudinary.py`:
-    `cloudinary.uploader.upload(file_path, public_id=...)`.
-
-    Returns a dict with `url` (secure URL) and `public_id`.
-    """
     configure_cloudinary()
 
     import cloudinary.uploader

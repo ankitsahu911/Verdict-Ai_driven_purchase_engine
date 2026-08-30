@@ -1,15 +1,3 @@
-"""
-Batch Backfill Script for Wardrobe CLIP Embeddings (MILESTONE 12).
-
-Scans all existing `wardrobe_items` in Postgres and generates + stores missing
-CLIP embeddings in ChromaDB (`wardrobe_items` collection).
-
-Idempotent: safe to re-run multiple times — skips items already embedded.
-
-Usage:
-    python scripts/backfill_embeddings.py
-"""
-
 import logging
 import os
 import sys
@@ -34,11 +22,6 @@ logger = logging.getLogger("backfill")
 
 
 def backfill_embeddings() -> tuple[int, int, int]:
-    """Loop over all wardrobe items and generate missing ChromaDB embeddings.
-
-    Returns:
-        (total_items, backfilled_count, skipped_count)
-    """
     db = SessionLocal()
     try:
         items = db.query(WardrobeItem).order_by(WardrobeItem.id.asc()).all()

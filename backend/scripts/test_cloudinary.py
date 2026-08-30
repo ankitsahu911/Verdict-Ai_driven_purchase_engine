@@ -1,11 +1,3 @@
-"""
-Test Cloudinary connectivity.
-
-Prerequisites:
-  - Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in .env
-    (paste values from your Cloudinary dashboard)
-"""
-
 import base64
 import os
 import sys
@@ -20,7 +12,6 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent / ".env")
 
-# ── Paste your Cloudinary credentials into .env ────────────────────────
 CLOUD_NAME = os.getenv("CLOUDINARY_CLOUD_NAME")
 API_KEY = os.getenv("CLOUDINARY_API_KEY")
 API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
@@ -37,10 +28,6 @@ cloudinary.config(
     secure=True,
 )
 
-# -----------------------------------------------------------------------
-# 2. Upload a tiny placeholder PNG
-# -----------------------------------------------------------------------
-# Minimal 1×1 red PNG (generated inline – no file needed on disk)
 MINIMAL_PNG_BASE64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ"
     "AAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
@@ -53,7 +40,7 @@ with tempfile.NamedTemporaryFile(suffix=".png", delete=False, mode="wb") as f:
 print(f"Uploading test image from {tmp_path} …")
 result = cloudinary.uploader.upload(tmp_path, public_id="verdict_test_pixel")
 
-os.unlink(tmp_path)  # clean up
+os.unlink(tmp_path)
 
 secure_url = result.get("secure_url")
 public_id = result.get("public_id")

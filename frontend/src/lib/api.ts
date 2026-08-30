@@ -41,10 +41,6 @@ export interface UploadResponse {
   failed: UploadFailure[];
 }
 
-/**
- * Upload a single photo to /api/wardrobe/upload using XHR so we get
- * real per-file upload progress. Requires a Firebase ID token.
- */
 export function uploadWardrobePhoto(
   file: File,
   token: string,
@@ -152,9 +148,6 @@ export interface CandidateEvaluationResult {
   errors: Record<string, string> | null;
 }
 
-/**
- * Upload candidate garment photo to POST /api/candidates for full orchestrated evaluation.
- */
 export function evaluateCandidate(
   file: File,
   token: string,
@@ -281,7 +274,7 @@ export type DecisionAxis =
 
 export interface AxisScoreData {
   axis: DecisionAxis;
-  score: number; // 0-100 normalized float (higher = more favorable to buying)
+  score: number;
   reason: string;
   source_agent: string;
   raw_evidence?: Record<string, unknown> | null;

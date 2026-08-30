@@ -1,14 +1,3 @@
-"""
-Vision Agent: LLM-based garment attribute extraction (MILESTONES 7 + 8).
-
-Takes an image URL and returns {category, color, pattern, style, season,
-material} using Google Gemini's structured-output mode (response_schema
-JSON schema) — no free-text parsing.
-
-Model is read from `GEMINI_VISION_MODEL` (defaults to gemini-3.5-flash)
-so it can be swapped without a code change.
-"""
-
 import json
 import os
 import time
@@ -20,12 +9,12 @@ load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent.parent.parent / "
 
 
 class VisionServiceError(RuntimeError):
-    """Raised when attribute extraction fails (config, API, or parsing)."""
+    pass
 
 
 DEFAULT_MODEL = "gemini-3.5-flash"
-REQUEST_TIMEOUT_MS = 60_000  # HttpOptions.timeout is in milliseconds
-MAX_RATE_LIMIT_RETRIES = 3  # 429/503 -> retry with backoff before giving up
+REQUEST_TIMEOUT_MS = 60_000
+MAX_RATE_LIMIT_RETRIES = 3
 
 SYSTEM_PROMPT = """You are an expert garment attribute extractor for a fashion AI.
 Analyze the garment photo and return exactly six attributes:
@@ -80,7 +69,6 @@ def _get_client():
 
 
 def _guess_mime(image_url: str) -> str:
-    """Infer the image MIME type from the URL so Gemini receives the right kind."""
     ext = Path(image_url.split("?")[0]).suffix.lower()
     return {
         ".png": "image/png",
@@ -101,9 +89,7 @@ def _is_rate_limit(e: Exception) -> bool:
     )
 
 
-
 def _fetch_image_part(image_url: str):
-    """Fetch image bytes from URL and wrap in Part.from_bytes for Gemini vision."""
     from google.genai import types
     mime = _guess_mime(image_url)
     try:
@@ -122,12 +108,6 @@ def _fetch_image_part(image_url: str):
 
 
 def analyze_image(image_url: str) -> dict:
-    """Extract 6 garment attributes from an image URL via Gemini vision.
-
-    Returns {category, color, pattern, style, season, material}.
-    Raises VisionServiceError with a clear message on any failure; never
-    propagates raw SDK exceptions.
-    """
     if not image_url:
         raise VisionServiceError("No image URL provided.")
 
@@ -160,7 +140,7 @@ def analyze_image(image_url: str) -> dict:
         except Exception as e:
             last_error = e
             if _is_rate_limit(e) and attempt < MAX_RATE_LIMIT_RETRIES - 1:
-                time.sleep(2 ** (attempt + 1))  # 2s, 4s backoff
+                time.sleep(2 ** (attempt + 1))
                 continue
             raise VisionServiceError(f"Gemini vision request failed: {e}") from e
 
@@ -224,11 +204,6 @@ FIT_OUTPUT_SCHEMA = {
 
 
 def analyze_fit(render_image_url: str) -> dict:
-    """Analyze a virtual try-on render image to derive fit tightness, silhouette, and notes.
-
-    Returns {fit_tightness, silhouette, notes}.
-    Raises VisionServiceError with a clear message on any failure.
-    """
     if not render_image_url:
         raise VisionServiceError("No render image URL provided.")
 
@@ -304,4 +279,3 @@ def analyze_fit(render_image_url: str) -> dict:
         "silhouette": silhouette,
         "notes": notes,
     }
-

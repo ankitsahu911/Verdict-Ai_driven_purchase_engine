@@ -1,9 +1,3 @@
-"""
-Verdict Decision Engine Scorers.
-
-Module containing concrete axis-scorer functions for decision evaluation.
-"""
-
 from app.decision_engine.scorers.budget_impact import score_budget_impact
 from app.decision_engine.scorers.occasion_coverage import score_occasion_coverage
 from app.decision_engine.scorers.redundancy import score_redundancy
@@ -21,5 +15,3 @@ __all__ = [
     "score_occasion_coverage",
     "get_wardrobe_style_distribution",
 ]
-
-

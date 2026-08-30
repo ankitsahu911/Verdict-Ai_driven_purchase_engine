@@ -1,10 +1,3 @@
-"""
-Try-On Agent service (MILESTONES 10 + 11).
-
-Orchestrates virtual try-on via YouCam API and immediately derives structured
-fit signals (fit_tightness, silhouette, notes) via Gemini vision analysis.
-"""
-
 import logging
 import os
 import time
@@ -21,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class TryOnServiceError(RuntimeError):
-    """Raised when virtual try-on processing fails."""
+    pass
 
 
 BASE_URL_V3 = "https://yce-api-01.makeupar.com/s2s/v2.0/task/cloth-v3"
@@ -34,18 +27,6 @@ def generate_tryon(
     user_photo_url: str | None = None,
     garment_category: str | None = None,
 ) -> dict:
-    """Generate virtual try-on render URL from YouCam and derive fit analysis.
-
-    Returns:
-        {
-            "render_url": str,
-            "fit_tightness": str | None,
-            "silhouette": str | None,
-            "notes": str | None,
-        }
-
-    If YouCam succeeds but fit analysis fails, returns render_url with null/empty fit fields.
-    """
     if not garment_url:
         raise TryOnServiceError("No garment image URL provided.")
 
@@ -76,7 +57,6 @@ def generate_tryon(
         "ref_file_url": garment_url,
     }
 
-    logger.info("Initiating YouCam try-on task for garment: %s", garment_url)
     try:
         resp = requests.post(BASE_URL_V3, json=payload, headers=headers, timeout=30)
     except Exception as e:
@@ -99,7 +79,6 @@ def generate_tryon(
     if not task_id:
         raise TryOnServiceError("YouCam response missing task_id.")
 
-    logger.info("YouCam task created: %s. Polling for results...", task_id)
     poll_url = f"{BASE_URL_V3}/{task_id}"
     start_time = time.monotonic()
     result_data = None
@@ -134,12 +113,8 @@ def generate_tryon(
     if not render_url:
         raise TryOnServiceError("YouCam result missing render image URL.")
 
-    logger.info("YouCam render URL generated successfully: %s", render_url)
-
-    # Separate fit analysis pass on rendered image
     fit_data = None
     try:
-        logger.info("Running fit analysis on render URL: %s", render_url)
         fit_data = analyze_fit(render_url)
     except Exception as e:
         logger.warning(
