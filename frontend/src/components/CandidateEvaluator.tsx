@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { NearDuplicateCard } from "@/components/NearDuplicateCard";
+import { VerdictCard } from "@/components/VerdictCard";
 import { getAuthToken, evaluateCandidate, type CandidateEvaluationResult } from "@/lib/api";
 
 const STAGES = [
@@ -178,12 +179,13 @@ export function CandidateEvaluator() {
                 </p>
               </div>
             </div>
-            <Badge variant="secondary" className="px-3 py-1 text-xs">
-              Candidate Item
-            </Badge>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Milestone 24: Decision Engine Verdict & Recharts 6-Axis Radar Card */}
+          <VerdictCard candidateId={result.candidate_item_id} />
+
+          {/* 3 Component Results Grid (Vision, Try-On, Duplicate) */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* 1. Garment Attributes Summary Card */}
             <Card className="flex flex-col">
               <CardHeader className="pb-2">

@@ -66,6 +66,22 @@ class WardrobeItem(Base):
     is_candidate: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False
     )
+    price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    tryon_render_url: Mapped[str | None] = mapped_column(
+        String(1024), nullable=True
+    )
+    fit_tightness: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
+    silhouette: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
+    duplicate_match_item_id: Mapped[int | None] = mapped_column(
+        ForeignKey("wardrobe_items.id"), nullable=True
+    )
+    duplicate_similarity_pct: Mapped[float | None] = mapped_column(
+        Float, nullable=True
+    )
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )

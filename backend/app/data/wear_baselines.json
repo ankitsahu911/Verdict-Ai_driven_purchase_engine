@@ -1,0 +1,32 @@
+{
+  "top": {
+    "annual_wears": 30,
+    "baseline_return_risk": 20,
+    "typical_cost_per_wear_ceiling": 3.50
+  },
+  "bottom": {
+    "annual_wears": 35,
+    "baseline_return_risk": 30,
+    "typical_cost_per_wear_ceiling": 4.00
+  },
+  "outerwear": {
+    "annual_wears": 15,
+    "baseline_return_risk": 25,
+    "typical_cost_per_wear_ceiling": 12.00
+  },
+  "dress": {
+    "annual_wears": 10,
+    "baseline_return_risk": 40,
+    "typical_cost_per_wear_ceiling": 15.00
+  },
+  "footwear": {
+    "annual_wears": 40,
+    "baseline_return_risk": 45,
+    "typical_cost_per_wear_ceiling": 4.50
+  },
+  "accessory": {
+    "annual_wears": 20,
+    "baseline_return_risk": 10,
+    "typical_cost_per_wear_ceiling": 3.00
+  }
+}

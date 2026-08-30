@@ -214,3 +214,106 @@ export interface OutfitMatchesResponse {
 export async function fetchOutfitMatches(candidateId: number): Promise<OutfitMatchesResponse> {
   return apiFetch(`/api/candidates/${candidateId}/outfit-matches`);
 }
+
+export interface OutfitCombinationItem {
+  wardrobe_item_id: number;
+  cloudinary_url: string;
+  attributes: GarmentAttributesData;
+}
+
+export interface OutfitCombination {
+  outfit_id: string;
+  total_score: number;
+  reason_summary: string;
+  candidate: OutfitCombinationItem;
+  items: OutfitCombinationItem[];
+  matched_rules: string[];
+}
+
+export interface OutfitCombinationsResponse {
+  candidate_id: number;
+  total_combinations_found: number;
+  combinations: OutfitCombination[];
+}
+
+export async function fetchOutfitCombinations(candidateId: number): Promise<OutfitCombinationsResponse> {
+  return apiFetch(`/api/candidates/${candidateId}/outfit-combinations`);
+}
+
+export interface ReturnRiskData {
+  score: number;
+  baseline_risk: number;
+  fit_adjustment: number;
+  fit_tightness: string;
+  reasoning: string;
+}
+
+export interface CandidateEconomicsData {
+  candidate_id: number;
+  price: number;
+  cost_per_wear: number;
+  baseline_wears_used: number;
+  category: string;
+  return_risk: ReturnRiskData | null;
+}
+
+export async function updateCandidatePrice(
+  candidateId: number,
+  price: number,
+): Promise<{ candidate_id: number; price: number }> {
+  return apiFetch(`/api/candidates/${candidateId}/price`, {
+    method: "PATCH",
+    body: JSON.stringify({ price }),
+  });
+}
+
+export async function fetchCandidateEconomics(candidateId: number): Promise<CandidateEconomicsData> {
+  return apiFetch(`/api/candidates/${candidateId}/economics`);
+}
+
+export type DecisionAxis =
+  | "versatility"
+  | "redundancy"
+  | "seasonal_relevance"
+  | "budget_impact"
+  | "style_alignment"
+  | "occasion_coverage";
+
+export interface AxisScoreData {
+  axis: DecisionAxis;
+  score: number; // 0-100 normalized float (higher = more favorable to buying)
+  reason: string;
+  source_agent: string;
+  raw_evidence?: Record<string, unknown> | null;
+}
+
+export interface CandidateDecisionPayloadData {
+  candidate_id: number;
+  scores: Record<DecisionAxis, AxisScoreData>;
+  overall_score?: number | null;
+}
+
+export interface CandidateAxesResponse {
+  candidate_id: number;
+  total_axes: number;
+  axes: AxisScoreData[];
+}
+
+export async function fetchCandidateAxes(candidateId: number): Promise<CandidateAxesResponse> {
+  return apiFetch(`/api/candidates/${candidateId}/axes`);
+}
+
+export interface BuyScoreResultData {
+  candidate_id: number;
+  verdict: "buy" | "consider" | "skip" | string;
+  overall_score: number;
+  headline_reason: string;
+  axes: AxisScoreData[];
+  weights_used: Record<string, number>;
+  decision_log_id?: number | null;
+  created_at: string;
+}
+
+export async function fetchCandidateBuyScore(candidateId: number): Promise<BuyScoreResultData> {
+  return apiFetch(`/api/candidates/${candidateId}/buy-score`);
+}
