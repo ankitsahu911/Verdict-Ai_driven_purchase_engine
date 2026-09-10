@@ -67,25 +67,28 @@ def score_budget_impact(candidate_item_id: int, db: Session) -> AxisScore:
     )
     final_score = max(0.0, min(100.0, blended_score))
 
+    article = "an" if cat_key.lower().startswith(("a", "e", "i", "o", "u")) else "a"
+    cat_phrase = f"{article} {cat_key} piece"
+
     if cpw <= cpw_ceiling and return_risk_score <= 30:
         reason = (
             f"Efficient cost-per-wear (${cpw:.2f}/wear vs ${cpw_ceiling:.2f} ceiling) "
-            f"for a {cat_key}, with low predicted return risk ({return_risk_score}%)."
+            f"for {cat_phrase}, with low predicted return risk ({return_risk_score:.0f}%)."
         )
     elif cpw <= cpw_ceiling and return_risk_score > 30:
         reason = (
-            f"Favorable cost-per-wear (${cpw:.2f}/wear) for a {cat_key}, "
-            f"with moderate return risk ({return_risk_score}%)."
+            f"Favorable cost-per-wear (${cpw:.2f}/wear) for {cat_phrase}, "
+            f"with moderate return risk ({return_risk_score:.0f}%)."
         )
     elif cpw > cpw_ceiling and return_risk_score <= 30:
         reason = (
             f"Elevated cost-per-wear (${cpw:.2f}/wear vs ${cpw_ceiling:.2f} ceiling) "
-            f"for a {cat_key}, offset by low predicted return risk ({return_risk_score}%)."
+            f"for {cat_phrase}, offset by low predicted return risk ({return_risk_score:.0f}%)."
         )
     else:
         reason = (
             f"High cost-per-wear (${cpw:.2f}/wear vs ${cpw_ceiling:.2f} ceiling) "
-            f"for a {cat_key}, coupled with elevated return risk ({return_risk_score}%)."
+            f"for {cat_phrase}, coupled with elevated return risk ({return_risk_score:.0f}%)."
         )
 
     return AxisScore(
@@ -103,5 +106,6 @@ def score_budget_impact(candidate_item_id: int, db: Session) -> AxisScore:
             "inverted_return_risk": inverted_return_risk,
             "cpw_weight": CPW_WEIGHT,
             "return_risk_weight": RETURN_RISK_WEIGHT,
+            "tryon_degraded": bool(getattr(candidate, "tryon_degraded", False)),
         },
     )

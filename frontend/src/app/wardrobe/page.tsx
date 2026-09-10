@@ -15,6 +15,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { NavigationHeader } from "@/components/NavigationHeader";
+import {
+  fadeUpVariants,
+  staggerContainerVariants,
+  staggerItemVariants,
+  DURATION_FAST,
+} from "@/lib/animations";
 import {
   type WardrobeItemData,
   type GarmentAttributesData,
@@ -67,7 +74,7 @@ function WardrobeContent() {
 
   const load = useCallback(() => {
     fetchWardrobe()
-      .then((data) => setItems(data))
+      .then((data) => setItems(Array.isArray(data) ? data : (data as any)?.items || []))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -122,35 +129,47 @@ function WardrobeContent() {
   }
 
   return (
-    <main className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
-          <h1 className="text-lg font-semibold">Wardrobe</h1>
-          <a href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground">
-            &larr; Dashboard
-          </a>
-        </div>
-      </header>
+    <main className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pb-16">
+      <NavigationHeader currentSubtitle="Wardrobe Grid" badgeText="Curated Closet" />
 
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={fadeUpVariants}
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 pb-5 border-b"
+        >
+          <div>
+            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">Wardrobe Collection</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Curated demo closet • Fully tagged and embedded in ChromaDB for instant retrieval
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant="buy" className="text-xs font-bold px-3 py-1 shadow-xs">
+              Pre-Verified ({items.length} items)
+            </Badge>
+          </div>
+        </motion.div>
+
         {error && (
-          <p className="mb-4 rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+          <div className="mb-6 rounded-2xl bg-destructive/10 p-4 text-sm text-destructive border border-destructive/20 font-medium">
             {error}
-          </p>
+          </div>
         )}
 
         {loading && <SkeletonGrid />}
 
         {!loading && items.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-24 text-center">
-            <p className="text-lg font-medium text-muted-foreground">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-24 text-center bg-muted/10">
+            <p className="text-lg font-bold text-muted-foreground">
               No items yet
             </p>
-            <p className="mt-1 text-sm text-muted-foreground/80">
-              Upload some wardrobe photos from the dashboard to get started.
+            <p className="mt-1 text-sm text-muted-foreground/80 max-w-md">
+              Upload some wardrobe photos from the dashboard to get started with outfit evaluation.
             </p>
             <a href="/dashboard" className="mt-4">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="font-semibold rounded-xl">
                 Go to Dashboard
               </Button>
             </a>
@@ -158,27 +177,31 @@ function WardrobeContent() {
         )}
 
         {!loading && items.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={staggerContainerVariants}
+            className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          >
             <AnimatePresence mode="popLayout">
               {items.map((item) => (
                 <motion.div
                   key={item.id}
                   layout
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.2 }}
+                  variants={staggerItemVariants}
+                  whileHover={{ y: -3, transition: { duration: DURATION_FAST } }}
                 >
                   <Card
-                    className={`group relative overflow-hidden transition-shadow hover:shadow-md ${
+                    className={`group relative overflow-hidden rounded-2xl border shadow-sm transition-all hover:shadow-md ${
                       flashId === item.id
-                        ? "ring-2 ring-green-500/60"
+                        ? "ring-2 ring-emerald-500/60"
                         : ""
                     }`}
                   >
                     <motion.div
                       animate={
                         flashId === item.id
-                          ? { backgroundColor: ["rgba(34,197,94,0.08)", "transparent"] }
+                          ? { backgroundColor: ["rgba(16,185,129,0.12)", "transparent"] }
                           : {}
                       }
                       transition={{ duration: 1.2 }}
@@ -188,14 +211,14 @@ function WardrobeContent() {
                       <img
                         src={item.cloudinary_url}
                         alt="Wardrobe item"
-                        className="h-full w-full object-cover"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                       <button
                         onClick={() => openEdit(item)}
-                        className="absolute right-2 top-2 rounded-full bg-background/80 p-1.5 opacity-0 shadow-sm backdrop-blur transition-opacity group-hover:opacity-100"
+                        className="absolute right-2.5 top-2.5 rounded-full bg-background/85 p-2 opacity-0 shadow-md backdrop-blur transition-opacity group-hover:opacity-100"
                         aria-label="Edit attributes"
                       >
-                        <Pencil className="h-4 w-4" />
+                        <Pencil className="h-3.5 w-3.5 text-foreground" />
                       </button>
                     </div>
                     <CardContent className="p-4">
@@ -204,18 +227,18 @@ function WardrobeContent() {
                           const val = item.attributes?.[key];
                           if (!val) return null;
                           return (
-                            <Badge key={key} variant="secondary" className="text-[11px]">
+                            <Badge key={key} variant="secondary" className="text-[11px] font-medium rounded-lg">
                               {val}
                             </Badge>
                           );
                         })}
                         {item.attributes?.extraction_source === "ai" && (
-                          <Badge variant="outline" className="text-[11px]">
+                          <Badge variant="outline" className="text-[11px] rounded-lg">
                             AI
                           </Badge>
                         )}
                         {item.attributes?.extraction_source === "manual_override" && (
-                          <Badge variant="outline" className="text-[11px]">
+                          <Badge variant="outline" className="text-[11px] rounded-lg">
                             Manual
                           </Badge>
                         )}
@@ -230,7 +253,7 @@ function WardrobeContent() {
                 </motion.div>
               ))}
             </AnimatePresence>
-          </div>
+          </motion.div>
         )}
       </div>
 

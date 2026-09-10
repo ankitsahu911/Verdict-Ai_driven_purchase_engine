@@ -32,13 +32,27 @@ def configure_cloudinary() -> None:
 
 
 def upload_image(file_path: str | Path, public_id: str | None = None) -> dict:
-    configure_cloudinary()
+    try:
+        configure_cloudinary()
+        import cloudinary.uploader
+        result = cloudinary.uploader.upload(str(file_path), public_id=public_id)
+        return {
+            "url": result.get("secure_url"),
+            "public_id": result.get("public_id"),
+        }
+    except CloudinaryConfigError as e:
+        import logging
+        import shutil
+        import uuid
 
-    import cloudinary.uploader
-
-    result = cloudinary.uploader.upload(str(file_path), public_id=public_id)
-
-    return {
-        "url": result.get("secure_url"),
-        "public_id": result.get("public_id"),
-    }
+        logger = logging.getLogger(__name__)
+        logger.warning("Cloudinary unconfigured (%s); storing image locally.", e)
+        uploads_dir = Path(__file__).resolve().parent.parent.parent / "data" / "uploads"
+        uploads_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{uuid.uuid4().hex}_{Path(file_path).name}"
+        dest_path = uploads_dir / filename
+        shutil.copyfile(str(file_path), str(dest_path))
+        return {
+            "url": str(dest_path),
+            "public_id": public_id or filename,
+        }

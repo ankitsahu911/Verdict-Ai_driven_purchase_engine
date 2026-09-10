@@ -14,12 +14,27 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
-  if (token) {
+  
+  const isDemo = typeof window !== "undefined" && localStorage.getItem("verdict_demo_token") === "true";
+  if (isDemo) {
+    headers["X-Verdict-User"] = "demo";
+    headers["Authorization"] = "Bearer demo-token";
+  } else if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
+
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
   if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+    let detail = "";
+    try {
+      const errData = await res.json();
+      if (errData && typeof errData === "object" && errData.detail) {
+        detail = typeof errData.detail === "string" ? errData.detail : JSON.stringify(errData.detail);
+      }
+    } catch {
+      // Ignore JSON parse error
+    }
+    throw new Error(detail || `API error: ${res.status}`);
   }
   return res.json();
 }
@@ -64,7 +79,16 @@ export function uploadWardrobePhoto(
           reject(new Error("Invalid server response"));
         }
       } else {
-        reject(new Error(`Upload failed (HTTP ${xhr.status})`));
+        let errorMsg = `Upload failed (HTTP ${xhr.status})`;
+        try {
+          const errBody = JSON.parse(xhr.responseText);
+          if (errBody?.detail) {
+            errorMsg = typeof errBody.detail === "string" ? errBody.detail : JSON.stringify(errBody.detail);
+          }
+        } catch {
+          // ignore
+        }
+        reject(new Error(errorMsg));
       }
     };
 
@@ -86,6 +110,7 @@ export interface GarmentAttributesData {
   season: string | null;
   material: string | null;
   extraction_source: string | null;
+  provider_used?: string | null;
 }
 
 export interface WardrobeItemData {
@@ -95,8 +120,11 @@ export interface WardrobeItemData {
   attributes: GarmentAttributesData | null;
 }
 
-export async function fetchWardrobe(): Promise<WardrobeItemData[]> {
-  return apiFetch("/api/wardrobe");
+export async function fetchWardrobe(limit = 100): Promise<WardrobeItemData[]> {
+  const res = await apiFetch(`/api/wardrobe?limit=${limit}`);
+  if (Array.isArray(res)) return res;
+  if (res && Array.isArray(res.items)) return res.items;
+  return [];
 }
 
 export async function patchAttributes(
@@ -137,6 +165,18 @@ export interface CandidateTryOnData {
   fit_tightness: string | null;
   silhouette: string | null;
   notes: string | null;
+  cached?: boolean;
+  tryon_degraded?: boolean;
+}
+
+export interface CandidateEvaluationTimings {
+  total_ms: number;
+  vision_agent_ms: number;
+  tryon_agent_ms: number;
+  embedding_agent_ms: number;
+  duplicate_detection_ms: number;
+  target_ms: number;
+  meets_target: boolean;
 }
 
 export interface CandidateEvaluationResult {
@@ -146,6 +186,7 @@ export interface CandidateEvaluationResult {
   tryon: CandidateTryOnData | null;
   duplicate: NearDuplicateMatch | null;
   errors: Record<string, string> | null;
+  timings?: CandidateEvaluationTimings | null;
 }
 
 export function evaluateCandidate(
@@ -296,6 +337,26 @@ export async function fetchCandidateAxes(candidateId: number): Promise<Candidate
   return apiFetch(`/api/candidates/${candidateId}/axes`);
 }
 
+export interface ConfidenceResultData {
+  level: "high" | "medium" | "low" | string;
+  reasoning: string;
+  signals?: Record<string, any> | null;
+}
+
+export interface DecisionSummaryMetricsData {
+  versatility: number;
+  versatility_outfits_count: number;
+  duplicate_risk: number;
+  duplicate_risk_label: string;
+  seasonality: number;
+  seasonality_label: string;
+  cost_per_wear: number;
+  cost_per_wear_formatted: string;
+  sustainability_tier: "Lower impact" | "Higher impact" | "Unrated" | string;
+  sustainability_reason: string;
+  is_estimate: boolean;
+}
+
 export interface BuyScoreResultData {
   candidate_id: number;
   verdict: "buy" | "consider" | "skip" | string;
@@ -304,9 +365,160 @@ export interface BuyScoreResultData {
   axes: AxisScoreData[];
   weights_used: Record<string, number>;
   decision_log_id?: number | null;
+  confidence?: ConfidenceResultData | null;
+  summary_panel?: DecisionSummaryMetricsData | null;
+  tryon_degraded?: boolean;
   created_at: string;
 }
 
 export async function fetchCandidateBuyScore(candidateId: number): Promise<BuyScoreResultData> {
   return apiFetch(`/api/candidates/${candidateId}/buy-score`);
+}
+
+export interface CandidateItemData {
+  id: number;
+  cloudinary_url: string;
+  price: number | null;
+  fit_tightness?: string | null;
+  silhouette?: string | null;
+  tryon_render_url?: string | null;
+  tryon_cached_model_photo_url?: string | null;
+  tryon_degraded?: boolean;
+  duplicate_similarity_pct?: number | null;
+  uploaded_at: string;
+  attributes: GarmentAttributesData | null;
+}
+
+export async function updateModelPhoto(
+  modelPhotoUrl: string,
+): Promise<{ user_id: number; model_photo_url: string }> {
+  return apiFetch("/api/me/model-photo", {
+    method: "PATCH",
+    body: JSON.stringify({ model_photo_url: modelPhotoUrl }),
+  });
+}
+
+export async function requestTryOn(
+  itemId: number,
+  options?: { user_photo_url?: string; garment_category?: string; force?: boolean },
+): Promise<CandidateTryOnData & { cached: boolean }> {
+  const query = options?.force ? "?force=true" : "";
+  return apiFetch(`/api/tryon/${itemId}${query}`, {
+    method: "POST",
+    body: JSON.stringify({
+      user_photo_url: options?.user_photo_url,
+      garment_category: options?.garment_category,
+    }),
+  });
+}
+
+export async function fetchCandidates(): Promise<CandidateItemData[]> {
+  return apiFetch("/api/candidates");
+}
+
+export interface SubsetRecordData {
+  subset_id: string;
+  size: number;
+  item_ids: number[];
+}
+
+export interface EnumerateSubsetsResponseData {
+  total_items: number;
+  total_subsets: number;
+  subsets: SubsetRecordData[];
+}
+
+export async function enumerateSubsets(itemIds: number[]): Promise<EnumerateSubsetsResponseData> {
+  return apiFetch("/api/what-if/enumerate", {
+    method: "POST",
+    body: JSON.stringify({ item_ids: itemIds }),
+  });
+}
+
+export interface ScoredSubsetData {
+  subset_id: string;
+  rank: number;
+  size: number;
+  item_ids: number[];
+  verdict: "buy" | "consider" | "skip" | string;
+  overall_score: number;
+  headline_reason: string;
+  axes: AxisScoreData[];
+  total_price: number;
+  confidence?: ConfidenceResultData | null;
+  summary_panel?: DecisionSummaryMetricsData | null;
+}
+
+export interface ScoreSubsetsResponseData {
+  total_items: number;
+  total_subsets: number;
+  top_recommendation: ScoredSubsetData;
+  subsets: ScoredSubsetData[];
+}
+
+export async function scoreWhatIfSubsets(itemIds: number[]): Promise<ScoreSubsetsResponseData> {
+  return apiFetch("/api/what-if/score", {
+    method: "POST",
+    body: JSON.stringify({ item_ids: itemIds }),
+  });
+}
+
+export interface OpportunityCostCompareResponseData {
+  candidate: BuyScoreResultData;
+  alternative_bundle: ScoredSubsetData;
+  candidate_versatility: number;
+  alternative_bundle_versatility: number;
+  versatility_delta: number;
+  candidate_outfit_count: number;
+  alternative_bundle_outfit_count: number;
+  outfit_count_delta: number;
+  candidate_name: string;
+  alternative_names: string[];
+}
+
+export async function compareOpportunityCost(
+  candidateItemId: number,
+  alternativeItemIds: number[],
+): Promise<OpportunityCostCompareResponseData> {
+  return apiFetch("/api/opportunity-cost/compare", {
+    method: "POST",
+    body: JSON.stringify({
+      candidate_item_id: candidateItemId,
+      alternative_item_ids: alternativeItemIds,
+    }),
+  });
+}
+
+export interface RetrievedWardrobeItemData {
+  id: number;
+  category: string;
+  color: string;
+  style: string;
+  pattern: string;
+  season: string;
+  material: string;
+  thumbnail_url: string | null;
+  similarity_score: number;
+  distance: number;
+}
+
+export interface StylistChatResponseData {
+  reply: string;
+  retrieved_items: RetrievedWardrobeItemData[];
+  provider_used: string;
+  model_used: string;
+  guardrail_triggered?: boolean;
+}
+
+export async function chatWithStylist(
+  message: string,
+  topK: number = 5,
+): Promise<StylistChatResponseData> {
+  return apiFetch("/api/stylist/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      message,
+      top_k: topK,
+    }),
+  });
 }

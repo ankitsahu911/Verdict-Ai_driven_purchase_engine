@@ -26,6 +26,12 @@ class CandidateDecisionPayload(BaseModel):
     overall_score: float | None = Field(default=None, ge=0.0, le=100.0)
 
 
+class ConfidenceResult(BaseModel):
+    level: str = Field(..., description="'high' | 'medium' | 'low'")
+    reasoning: str = Field(..., description="Explanation naming the contributing signals")
+    signals: dict[str, Any] | None = Field(default=None, description="Supporting numerical metrics")
+
+
 class BuyScoreResult(BaseModel):
     candidate_id: int
     verdict: str
@@ -34,4 +40,7 @@ class BuyScoreResult(BaseModel):
     axes: list[AxisScore]
     weights_used: dict[str, float]
     decision_log_id: int | None = None
+    confidence: ConfidenceResult | None = None
+    summary_panel: dict[str, Any] | None = None
+    tryon_degraded: bool = False
     created_at: str

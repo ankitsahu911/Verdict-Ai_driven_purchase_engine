@@ -24,7 +24,7 @@ def score_redundancy(candidate_item_id: int, db: Session) -> AxisScore:
         return AxisScore(
             axis=DecisionAxis.REDUNDANCY,
             score=100.0,
-            reason="No close match in your current wardrobe.",
+            reason="No close match in your current wardrobe (100/100 uniqueness — completely fresh addition).",
             source_agent="duplicate_detection",
             raw_evidence={
                 "duplicate_similarity_pct": None,
@@ -35,11 +35,20 @@ def score_redundancy(candidate_item_id: int, db: Session) -> AxisScore:
     uniqueness_score = round(max(0.0, min(100.0, 100.0 - float(sim_pct))), 1)
 
     if sim_pct >= 85.0:
-        reason = f"{sim_pct}% similar to an item you already own — largely redundant."
-    elif sim_pct >= 50.0:
-        reason = f"{sim_pct}% similar to a item in your current wardrobe."
+        reason = (
+            f"{sim_pct:.1f}% similar to an item you already own — largely redundant "
+            f"({uniqueness_score:.0f}/100 uniqueness, 100 minus duplicate overlap)."
+        )
+    elif sim_pct >= 45.0:
+        reason = (
+            f"{sim_pct:.1f}% similar to an item in your current wardrobe — moderate overlap "
+            f"({uniqueness_score:.0f}/100 uniqueness)."
+        )
     else:
-        reason = f"Low similarity ({sim_pct}%) to existing wardrobe items."
+        reason = (
+            f"Low duplicate overlap ({sim_pct:.1f}%) with existing wardrobe items — "
+            f"high uniqueness ({uniqueness_score:.0f}/100)."
+        )
 
     return AxisScore(
         axis=DecisionAxis.REDUNDANCY,

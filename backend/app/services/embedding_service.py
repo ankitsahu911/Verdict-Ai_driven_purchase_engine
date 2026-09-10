@@ -30,8 +30,12 @@ def _get_model_and_processor():
             import torch
             from transformers import CLIPModel, CLIPProcessor
 
-            _processor = CLIPProcessor.from_pretrained(model_name)
-            _model = CLIPModel.from_pretrained(model_name)
+            try:
+                _processor = CLIPProcessor.from_pretrained(model_name, local_files_only=True)
+                _model = CLIPModel.from_pretrained(model_name, local_files_only=True)
+            except Exception:
+                _processor = CLIPProcessor.from_pretrained(model_name)
+                _model = CLIPModel.from_pretrained(model_name)
             _model.eval()
         except Exception as e:
             raise EmbeddingServiceError(
@@ -68,6 +72,16 @@ def generate_embedding(image_url_or_path: str) -> list[float]:
 
         with torch.no_grad():
             image_features = model.get_image_features(**inputs)
+            if not isinstance(image_features, torch.Tensor):
+                if hasattr(image_features, "pooler_output") and image_features.pooler_output is not None:
+                    image_features = image_features.pooler_output
+                elif hasattr(image_features, "image_embeds") and image_features.image_embeds is not None:
+                    image_features = image_features.image_embeds
+                elif hasattr(image_features, "last_hidden_state") and image_features.last_hidden_state is not None:
+                    image_features = image_features.last_hidden_state[:, 0, :]
+                else:
+                    image_features = image_features[0]
+
             image_features = image_features / image_features.norm(
                 p=2, dim=-1, keepdim=True
             )
@@ -78,3 +92,42 @@ def generate_embedding(image_url_or_path: str) -> list[float]:
         raise EmbeddingServiceError(
             f"CLIP embedding inference failed: {e}"
         ) from e
+
+
+def generate_text_embedding(text: str) -> list[float]:
+    """
+    Generate a normalized CLIP text embedding sharing the exact same
+    vector space as the wardrobe image embeddings in ChromaDB.
+    """
+    if not text or not str(text).strip():
+        raise EmbeddingServiceError("No text provided for embedding.")
+
+    try:
+        import torch
+
+        model, processor = _get_model_and_processor()
+        inputs = processor(text=[str(text).strip()], return_tensors="pt", padding=True, truncation=True)
+
+        with torch.no_grad():
+            text_features = model.get_text_features(**inputs)
+            if not isinstance(text_features, torch.Tensor):
+                if hasattr(text_features, "pooler_output") and text_features.pooler_output is not None:
+                    text_features = text_features.pooler_output
+                elif hasattr(text_features, "text_embeds") and text_features.text_embeds is not None:
+                    text_features = text_features.text_embeds
+                elif hasattr(text_features, "last_hidden_state") and text_features.last_hidden_state is not None:
+                    text_features = text_features.last_hidden_state[:, 0, :]
+                else:
+                    text_features = text_features[0]
+
+            text_features = text_features / text_features.norm(
+                p=2, dim=-1, keepdim=True
+            )
+            vector = text_features[0].tolist()
+
+        return [float(x) for x in vector]
+    except Exception as e:
+        raise EmbeddingServiceError(
+            f"CLIP text embedding inference failed: {e}"
+        ) from e
+

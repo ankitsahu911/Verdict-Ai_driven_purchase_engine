@@ -30,6 +30,12 @@ export default function Home() {
         >
           Dashboard
         </Link>
+        <Link
+          href="/stylist"
+          className="rounded bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+        >
+          Stylist Chat
+        </Link>
       </div>
     </main>
   );

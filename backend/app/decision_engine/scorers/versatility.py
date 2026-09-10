@@ -59,7 +59,10 @@ def score_versatility(candidate_item_id: int, db: Session) -> AxisScore:
     norm_score = round(min(100.0, (count / MAX_VERSATILITY_CAP) * 100.0), 1)
 
     if count == 0:
-        reason = "Does not pair into complete outfits with your current wardrobe items."
+        if not existing_items:
+            reason = "Does not pair into complete outfits — no compatible items found yet — upload some wardrobe items first."
+        else:
+            reason = "Does not pair into complete outfits with your current wardrobe items."
     elif count == 1:
         reason = "Pairs into 1 complete outfit with items you already own."
     else:

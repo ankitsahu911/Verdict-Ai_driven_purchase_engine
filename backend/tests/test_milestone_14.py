@@ -181,7 +181,8 @@ class TestMilestone14CandidateOrchestration(unittest.TestCase):
 
         self.assertIn("candidate_item_id", response)
         self.assertEqual(response["attributes"]["category"], "jacket")
-        self.assertIsNone(response["tryon"])
+        self.assertIsNotNone(response["tryon"])
+        self.assertTrue(response["tryon"]["tryon_degraded"])
         self.assertIsNotNone(response["errors"])
         self.assertIn("tryon", response["errors"])
         self.assertIn("No model/user photo URL", response["errors"]["tryon"])

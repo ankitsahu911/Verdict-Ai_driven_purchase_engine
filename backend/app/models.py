@@ -40,6 +40,7 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    model_photo_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
@@ -70,11 +71,17 @@ class WardrobeItem(Base):
     tryon_render_url: Mapped[str | None] = mapped_column(
         String(1024), nullable=True
     )
+    tryon_cached_model_photo_url: Mapped[str | None] = mapped_column(
+        String(1024), nullable=True
+    )
     fit_tightness: Mapped[str | None] = mapped_column(
         String(100), nullable=True
     )
     silhouette: Mapped[str | None] = mapped_column(
         String(100), nullable=True
+    )
+    tryon_degraded: Mapped[bool | None] = mapped_column(
+        Boolean, default=False, nullable=True
     )
     duplicate_match_item_id: Mapped[int | None] = mapped_column(
         ForeignKey("wardrobe_items.id"), nullable=True

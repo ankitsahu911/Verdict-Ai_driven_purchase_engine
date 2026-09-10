@@ -66,6 +66,13 @@ def query_similar_items(
 ) -> list[dict]:
     collection = get_wardrobe_collection()
 
+    try:
+        if collection.count() == 0:
+            return []
+    except Exception as e:
+        logger.warning("ChromaDB count check failed: %s", e)
+        return []
+
     where_filter = {}
     if user_id is not None:
         where_filter["user_id"] = int(user_id)
@@ -81,7 +88,11 @@ def query_similar_items(
     if where_filter:
         kwargs["where"] = where_filter
 
-    res = collection.query(**kwargs)
+    try:
+        res = collection.query(**kwargs)
+    except Exception as query_err:
+        logger.warning("ChromaDB query failed gracefully: %s", query_err)
+        return []
 
     if not res or not res.get("ids") or len(res["ids"][0]) == 0:
         return []

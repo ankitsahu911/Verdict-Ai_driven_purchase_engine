@@ -107,71 +107,56 @@ def _fetch_image_part(image_url: str):
     return types.Part.from_uri(file_uri=image_url, mime_type=mime)
 
 
+from app.services.llm_provider import get_vision_completion
+
+
 def analyze_image(image_url: str) -> dict:
     if not image_url:
         raise VisionServiceError("No image URL provided.")
 
-    model = os.getenv("GEMINI_VISION_MODEL", DEFAULT_MODEL)
-    client = _get_client()
-
-    from google.genai import types
-
-    image_part = _fetch_image_part(image_url)
-
-    response = None
-    last_error: Exception | None = None
-    for attempt in range(MAX_RATE_LIMIT_RETRIES):
+    if os.path.exists(image_url):
         try:
-            response = client.models.generate_content(
-                model=model,
-                contents=[
-                    image_part,
-                    types.Part.from_text(
-                        text="Describe the garment in this photo. Respond with JSON."
-                    ),
-                ],
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    response_mime_type="application/json",
-                    response_schema=OUTPUT_SCHEMA,
-                ),
-            )
-            break
-        except Exception as e:
-            last_error = e
-            if _is_rate_limit(e) and attempt < MAX_RATE_LIMIT_RETRIES - 1:
-                time.sleep(2 ** (attempt + 1))
-                continue
-            raise VisionServiceError(f"Gemini vision request failed: {e}") from e
+            from PIL import Image
 
-    if response is None:
-        raise VisionServiceError(
-            f"Gemini vision request failed: {last_error}"
-        ) from last_error
+            with Image.open(image_url) as img:
+                img.verify()
+        except Exception as img_err:
+            raise VisionServiceError(
+                f"couldn't read this image — file is corrupted or unreadable: {img_err}"
+            )
 
     try:
-        if getattr(response, "parsed", None) is not None:
-            data = dict(response.parsed)
-        else:
-            content = response.text
-            if not content:
-                raise ValueError("empty response body")
-            data = json.loads(content)
-    except (ValueError, KeyError, IndexError, TypeError) as e:
-        raise VisionServiceError(f"Could not parse Gemini response: {e}") from e
+        completion = get_vision_completion(
+            prompt="Describe the garment in this photo. Respond with JSON.",
+            image_url=image_url,
+            system_instruction=SYSTEM_PROMPT,
+            response_schema=OUTPUT_SCHEMA,
+        )
+    except Exception as e:
+        if "couldn't read this image" in str(e).lower():
+            raise VisionServiceError(str(e)) from e
+        raise VisionServiceError(f"Gemini vision request failed: {e}") from e
 
-    required = {"category", "color", "pattern", "style", "season", "material"}
-    missing = required - set(data)
-    if missing:
-        raise VisionServiceError(f"Gemini response missing fields: {sorted(missing)}")
+    data = completion.data
+    if not isinstance(data, dict):
+        raise VisionServiceError(f"Could not parse vision response: invalid data type {type(data)}")
+
+    # For local/fallback models, provide sensible fallbacks for any missing attributes
+    category = str(data.get("category", "unknown") or "unknown").lower().strip()
+    color = str(data.get("color", "unknown") or "unknown").strip()
+    pattern = str(data.get("pattern", "solid") or "solid").strip()
+    style = str(data.get("style", "casual") or "casual").strip()
+    season = str(data.get("season", "all-season") or "all-season").strip()
+    material = str(data.get("material", "cotton") or "cotton").strip()
 
     return {
-        "category": data["category"],
-        "color": data["color"],
-        "pattern": data["pattern"],
-        "style": data["style"],
-        "season": data["season"],
-        "material": data["material"],
+        "category": category,
+        "color": color,
+        "pattern": pattern,
+        "style": style,
+        "season": season,
+        "material": material,
+        "provider_used": completion.provider_used,
     }
 
 
@@ -207,75 +192,39 @@ def analyze_fit(render_image_url: str) -> dict:
     if not render_image_url:
         raise VisionServiceError("No render image URL provided.")
 
-    model = os.getenv("GEMINI_VISION_MODEL", DEFAULT_MODEL)
-    client = _get_client()
-
-    from google.genai import types
-
-    image_part = _fetch_image_part(render_image_url)
-
-    response = None
-    last_error: Exception | None = None
-    for attempt in range(MAX_RATE_LIMIT_RETRIES):
-        try:
-            response = client.models.generate_content(
-                model=model,
-                contents=[
-                    image_part,
-                    types.Part.from_text(
-                        text="Analyze the fit and silhouette of the garment in this try-on render photo. Respond with JSON."
-                    ),
-                ],
-                config=types.GenerateContentConfig(
-                    system_instruction=FIT_SYSTEM_PROMPT,
-                    response_mime_type="application/json",
-                    response_schema=FIT_OUTPUT_SCHEMA,
-                ),
-            )
-            break
-        except Exception as e:
-            last_error = e
-            if _is_rate_limit(e) and attempt < MAX_RATE_LIMIT_RETRIES - 1:
-                time.sleep(2 ** (attempt + 1))
-                continue
-            raise VisionServiceError(f"Gemini fit vision request failed: {e}") from e
-
-    if response is None:
-        raise VisionServiceError(
-            f"Gemini fit vision request failed: {last_error}"
-        ) from last_error
-
     try:
-        if getattr(response, "parsed", None) is not None:
-            data = dict(response.parsed)
-        else:
-            content = response.text
-            if not content:
-                raise ValueError("empty response body")
-            data = json.loads(content)
-    except (ValueError, KeyError, IndexError, TypeError) as e:
-        raise VisionServiceError(f"Could not parse Gemini fit response: {e}") from e
+        completion = get_vision_completion(
+            prompt="Analyze the fit and silhouette of the garment in this try-on render photo. Respond with JSON.",
+            image_url=render_image_url,
+            system_instruction=FIT_SYSTEM_PROMPT,
+            response_schema=FIT_OUTPUT_SCHEMA,
+        )
+    except Exception as e:
+        raise VisionServiceError(f"Fit vision request failed: {e}") from e
 
-    required = {"fit_tightness", "silhouette", "notes"}
-    missing = required - set(data)
-    if missing:
-        raise VisionServiceError(f"Gemini fit response missing fields: {sorted(missing)}")
+    data = completion.data
+    if not isinstance(data, dict):
+        raise VisionServiceError(f"Could not parse fit vision response: {data}")
 
     allowed_tightness = {"tight", "regular", "loose", "oversized"}
     allowed_silhouette = {"slim", "tailored", "relaxed", "boxy"}
 
-    fit_tightness = str(data.get("fit_tightness", "")).lower()
+    fit_tightness = str(data.get("fit_tightness", "")).lower().strip()
     if fit_tightness not in allowed_tightness:
         fit_tightness = "regular"
 
-    silhouette = str(data.get("silhouette", "")).lower()
+    silhouette = str(data.get("silhouette", "")).lower().strip()
     if silhouette not in allowed_silhouette:
         silhouette = "tailored"
 
-    notes = str(data.get("notes", ""))
+    notes = str(data.get("notes", "")).strip()
+    if not notes:
+        notes = "Visual fit assessment completed."
 
     return {
         "fit_tightness": fit_tightness,
         "silhouette": silhouette,
         "notes": notes,
+        "provider_used": completion.provider_used,
     }
+

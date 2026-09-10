@@ -2,7 +2,9 @@ from datetime import datetime, timezone
 import logging
 from sqlalchemy.orm import Session
 
+from app.decision_engine.confidence import calculate_confidence
 from app.decision_engine.schema import AxisScore, BuyScoreResult, DecisionAxis
+from app.services.dashboard_service import assemble_candidate_summary_panel
 from app.decision_engine.scorers import (
     score_budget_impact,
     score_occasion_coverage,
@@ -43,14 +45,54 @@ def build_headline_reason(
     if not axes:
         return f"{verdict.upper()}: Baseline evaluation complete."
 
+    verdict_label = verdict.upper()
     best_axis = max(axes, key=lambda a: a.score)
     worst_axis = min(axes, key=lambda a: a.score)
-    verdict_label = verdict.upper()
+    score_spread = best_axis.score - worst_axis.score
 
-    if worst_axis.score < 40.0 and worst_axis.axis != best_axis.axis:
-        return f"{verdict_label}: {best_axis.reason} (Though note: {worst_axis.reason})"
+    # Edge Case 1: Single axis or identical best/worst axis
+    if len(axes) == 1 or best_axis.axis == worst_axis.axis:
+        return f"{verdict_label}: {best_axis.reason}"
 
-    return f"{verdict_label}: {best_axis.reason}"
+    # Edge Case 2: Tight cluster across multiple axes (no clear standout, spread <= 8.0)
+    if len(axes) >= 3 and score_spread <= 8.0:
+        if verdict.lower() == "buy":
+            return f"{verdict_label}: Well-rounded addition with consistent positive scores across all evaluation criteria."
+        elif verdict.lower() == "skip":
+            return f"{verdict_label}: Consistently low utility across all evaluation criteria with no standout strengths."
+        else:
+            return f"{verdict_label}: Balanced profile across all criteria with moderate utility and no single standout advantage or drawback."
+
+    # Edge Case 3 / Standard Case: Differentiated profile with clear standout
+    if verdict.lower() == "skip":
+        # For SKIP, lead with the primary drawback driving the skip decision
+        if best_axis.score >= 65.0 and best_axis.axis != worst_axis.axis:
+            best_note = best_axis.reason
+            formatted_best = (
+                best_note[0].lower() + best_note[1:]
+                if not best_note.startswith(("No ", "Only ", "Low "))
+                else best_note
+            )
+            return f"{verdict_label}: {worst_axis.reason} (Despite {formatted_best})"
+        return f"{verdict_label}: {worst_axis.reason}"
+
+    elif verdict.lower() == "buy":
+        # For BUY, lead with standout strength; flag severe drawback (< 40.0) as caveat
+        if worst_axis.score < 40.0 and worst_axis.axis != best_axis.axis:
+            return f"{verdict_label}: {best_axis.reason} (Though note: {worst_axis.reason})"
+        return f"{verdict_label}: {best_axis.reason}"
+
+    else:  # CONSIDER
+        # For CONSIDER, highlight tradeoffs
+        if worst_axis.score < 45.0 and best_axis.score >= 55.0:
+            worst_note = worst_axis.reason
+            formatted_worst = (
+                worst_note[0].lower() + worst_note[1:]
+                if not worst_note.startswith(("No ", "Only ", "Low "))
+                else worst_note
+            )
+            return f"{verdict_label}: {best_axis.reason} However, {formatted_worst}"
+        return f"{verdict_label}: {best_axis.reason}"
 
 
 def synthesize_buy_score(
@@ -90,33 +132,52 @@ def synthesize_buy_score(
     now_iso = datetime.now(timezone.utc).isoformat()
     decision_log_id: int | None = None
 
-    if persist:
-        candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_item_id).first()
-        if candidate:
-            try:
-                raw_payload = {
-                    "candidate_id": candidate_item_id,
-                    "overall_score": overall_score,
-                    "verdict": verdict,
-                    "headline_reason": headline,
-                    "axes": [a.model_dump() for a in axes],
-                    "weights_used": weights_used,
-                }
-                decision_enum = Decision(verdict)
-                log_entry = DecisionLog(
-                    user_id=candidate.user_id,
-                    wardrobe_item_id=candidate.id,
-                    decision=decision_enum,
-                    buy_score=overall_score,
-                    raw_payload=raw_payload,
-                    created_at=datetime.now(timezone.utc),
-                )
-                db.add(log_entry)
-                db.commit()
-                db.refresh(log_entry)
-                decision_log_id = log_entry.id
-            except Exception as e:
-                logger.warning("Failed to persist DecisionLog for candidate %s: %s", candidate_item_id, e)
+    candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_item_id).first()
+    candidate_style = (candidate.attributes.style if candidate and candidate.attributes else None)
+
+    confidence = calculate_confidence(
+        overall_score=overall_score,
+        axis_scores=axes,
+        style=candidate_style,
+    )
+
+    summary_panel = assemble_candidate_summary_panel(
+        candidate_item_id=candidate_item_id,
+        db=db,
+        versatility_axis=axes[0],
+        seasonality_axis=axes[2],
+    )
+
+    is_degraded = bool(getattr(candidate, "tryon_degraded", False))
+
+    if persist and candidate:
+        try:
+            raw_payload = {
+                "candidate_id": candidate_item_id,
+                "overall_score": overall_score,
+                "verdict": verdict,
+                "headline_reason": headline,
+                "axes": [a.model_dump() for a in axes],
+                "weights_used": weights_used,
+                "confidence": confidence.model_dump(),
+                "summary_panel": summary_panel.model_dump(),
+                "tryon_degraded": is_degraded,
+            }
+            decision_enum = Decision(verdict)
+            log_entry = DecisionLog(
+                user_id=candidate.user_id,
+                wardrobe_item_id=candidate.id,
+                decision=decision_enum,
+                buy_score=overall_score,
+                raw_payload=raw_payload,
+                created_at=datetime.now(timezone.utc),
+            )
+            db.add(log_entry)
+            db.commit()
+            db.refresh(log_entry)
+            decision_log_id = log_entry.id
+        except Exception as e:
+            logger.warning("Failed to persist DecisionLog for candidate %s: %s", candidate_item_id, e)
 
     return BuyScoreResult(
         candidate_id=candidate_item_id,
@@ -126,5 +187,8 @@ def synthesize_buy_score(
         axes=axes,
         weights_used=weights_used,
         decision_log_id=decision_log_id,
+        confidence=confidence,
+        summary_panel=summary_panel.model_dump(),
+        tryon_degraded=is_degraded,
         created_at=now_iso,
     )

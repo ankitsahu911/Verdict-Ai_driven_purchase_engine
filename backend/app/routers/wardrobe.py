@@ -101,6 +101,36 @@ async def upload_wardrobe_photos(
         tmp_path: str | None = None
         try:
             tmp_path, size_bytes = _stream_to_temp(file)
+            if tmp_path and os.path.exists(tmp_path):
+                with open(tmp_path, "rb") as f:
+                    raw_header = f.read(32)
+
+                is_magic_ok = (
+                    raw_header.startswith(b"\xff\xd8")
+                    or raw_header.startswith(b"\x89PNG")
+                    or (raw_header.startswith(b"RIFF") and len(raw_header) >= 12 and raw_header[8:12] == b"WEBP")
+                )
+                if not is_magic_ok:
+                    logger.warning("Corrupted image in wardrobe upload %s: invalid magic header", filename)
+                    failed.append({
+                        "filename": filename,
+                        "error": "couldn't read this image — file is corrupted or unreadable",
+                    })
+                    continue
+
+                try:
+                    from PIL import Image
+
+                    with Image.open(tmp_path) as img:
+                        img.verify()
+                except Exception as img_err:
+                    logger.warning("Corrupted image in wardrobe upload %s: %s", filename, img_err)
+                    failed.append({
+                        "filename": filename,
+                        "error": "couldn't read this image — file is corrupted or unreadable",
+                    })
+                    continue
+
             public_id = f"verdict/wardrobe/{owner.firebase_uid}/{uuid.uuid4().hex}"
             cloud = upload_image(tmp_path, public_id=public_id)
 
@@ -358,6 +388,97 @@ async def extract_attributes_endpoint(
         "material": attrs.material,
         "extraction_source": attrs.extraction_source.value,
         "cached": False,
+    }
+
+
+class PatchAttributesRequest(BaseModel):
+    category: str | None = None
+    color: str | None = None
+    pattern: str | None = None
+    style: str | None = None
+    season: str | None = None
+    material: str | None = None
+
+
+@router.patch("/{item_id}/attributes")
+async def patch_wardrobe_attributes(
+    item_id: int,
+    payload: PatchAttributesRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    owner = get_or_create_user(db, user["uid"], user["email"])
+
+    item = db.query(WardrobeItem).filter(WardrobeItem.id == item_id).first()
+    if item is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Wardrobe item not found",
+        )
+    if item.user_id != owner.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this item",
+        )
+
+    now = datetime.now(timezone.utc)
+    attrs = item.attributes
+
+    if attrs is None:
+        attrs = GarmentAttributes(
+            wardrobe_item_id=item.id,
+            category=payload.category,
+            color=payload.color,
+            pattern=payload.pattern,
+            style=payload.style,
+            season=payload.season,
+            material=payload.material,
+            extraction_source=ExtractionSource.MANUAL_OVERRIDE,
+            updated_at=now,
+        )
+        db.add(attrs)
+    else:
+        if payload.category is not None:
+            attrs.category = payload.category
+        if payload.color is not None:
+            attrs.color = payload.color
+        if payload.pattern is not None:
+            attrs.pattern = payload.pattern
+        if payload.style is not None:
+            attrs.style = payload.style
+        if payload.season is not None:
+            attrs.season = payload.season
+        if payload.material is not None:
+            attrs.material = payload.material
+        attrs.extraction_source = ExtractionSource.MANUAL_OVERRIDE
+        attrs.updated_at = now
+
+    db.commit()
+    db.refresh(attrs)
+
+    # If category changed, update metadata in ChromaDB if present
+    if payload.category:
+        try:
+            from app.services.chroma_service import get_wardrobe_collection
+            coll = get_wardrobe_collection()
+            coll.update(
+                ids=[str(item.id)],
+                metadatas=[{"user_id": int(owner.id), "category": str(attrs.category)}],
+            )
+        except Exception as e:
+            logger.debug("Failed updating ChromaDB metadata on patch attributes: %s", e)
+
+    return {
+        "item_id": item.id,
+        "attributes": {
+            "category": attrs.category,
+            "color": attrs.color,
+            "pattern": attrs.pattern,
+            "style": attrs.style,
+            "season": attrs.season,
+            "material": attrs.material,
+            "extraction_source": attrs.extraction_source.value,
+        },
     }
 
 
