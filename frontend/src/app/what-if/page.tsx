@@ -348,11 +348,11 @@ export default function WhatIfLabPage() {
   const isValidCount = selectedCount >= 3 && selectedCount <= 5;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pb-16">
+    <main className="min-h-screen bg-background pb-16">
       <NavigationHeader currentSubtitle="What-If Lab" badgeText="Cart Optimizer" />
 
       {/* Main Container */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -516,16 +516,16 @@ export default function WhatIfLabPage() {
                 animate="visible"
                 variants={fadeUpVariants}
               >
-                <Card className="border-2 border-emerald-500/50 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-card shadow-xl overflow-hidden">
+                <Card className="border-2 border-border/90 bg-card shadow-xl overflow-hidden rounded-3xl">
                   <div className="p-6 sm:p-8">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-emerald-500/20 pb-5">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
                       <div className="flex items-center gap-3.5">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500 text-emerald-950 font-black shadow-md">
-                          <Trophy className="h-7 w-7" />
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-serif font-black shadow-md">
+                          <Trophy className="h-7 w-7 text-amber-500" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <Badge className="bg-emerald-500 text-emerald-950 font-black text-xs px-2.5 py-0.5">
+                            <Badge className="bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 font-bold text-xs px-3 py-1 shadow-xs tracking-wider">
                               #1 OPTIMAL SELECTION
                             </Badge>
                             <span className="text-xs text-muted-foreground font-semibold">
@@ -533,28 +533,28 @@ export default function WhatIfLabPage() {
                             </span>
                             <ConfidenceBadge confidence={rankedResult.top_recommendation.confidence} size="md" />
                           </div>
-                          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mt-1">
+                          <h2 className="text-2xl sm:text-3xl font-serif font-bold tracking-tight text-foreground mt-1">
                             {getSubsetDisplayLabel(rankedResult.top_recommendation.item_ids)}
                           </h2>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4 bg-background/90 backdrop-blur-md px-5 py-3 rounded-2xl border shadow-sm">
+                      <div className="flex items-center gap-4 bg-muted/30 backdrop-blur-md px-5 py-3 rounded-2xl border border-border shadow-xs">
                         <div className="text-right">
-                          <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                          <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                             Buy Score
                           </div>
-                          <div className="text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400">
+                          <div className="text-3xl sm:text-4xl font-serif font-bold text-foreground">
                             {rankedResult.top_recommendation.overall_score.toFixed(1)}
                             <span className="text-xs font-semibold text-muted-foreground"> / 100</span>
                           </div>
                         </div>
                         {rankedResult.top_recommendation.total_price > 0 && (
-                          <div className="border-l pl-4 text-right">
-                            <div className="text-[11px] font-bold text-muted-foreground uppercase">
+                          <div className="border-l pl-4 text-right border-border">
+                            <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                               Cart Total
                             </div>
-                            <div className="text-xl font-bold text-foreground">
+                            <div className="text-xl font-bold font-mono text-foreground">
                               ${rankedResult.top_recommendation.total_price.toFixed(2)}
                             </div>
                           </div>
@@ -563,9 +563,9 @@ export default function WhatIfLabPage() {
                     </div>
 
                     <div className="mt-5 space-y-4">
-                      <div className="p-4 bg-background/90 backdrop-blur-md rounded-2xl border flex items-start gap-3">
-                        <Sparkles className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
-                        <p className="text-sm sm:text-base font-semibold text-foreground leading-relaxed">
+                      <div className="p-4 bg-muted/20 backdrop-blur-md rounded-2xl border border-border/80 flex items-start gap-3">
+                        <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-sm sm:text-base font-medium text-foreground leading-relaxed">
                           {rankedResult.top_recommendation.headline_reason}
                         </p>
                       </div>
@@ -573,7 +573,7 @@ export default function WhatIfLabPage() {
                       {/* Items Chips */}
                       {rankedResult.top_recommendation.item_ids.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <span className="text-xs font-bold text-muted-foreground uppercase">
+                          <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                             Included Items:
                           </span>
                           {rankedResult.top_recommendation.item_ids.map((id) => {
@@ -582,9 +582,9 @@ export default function WhatIfLabPage() {
                             return (
                               <div
                                 key={id}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-card text-xs font-semibold shadow-sm"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-semibold shadow-xs"
                               >
-                                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold text-[11px]">
+                                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-amber-600/15 text-amber-800 dark:text-amber-200 font-bold text-[11px]">
                                   {letter}
                                 </span>
                                 <span className="capitalize">{itm?.attributes?.color} {itm?.attributes?.category || `Item #${id}`}</span>
@@ -599,7 +599,7 @@ export default function WhatIfLabPage() {
 
                       {/* Milestone 31: 5-Metric Cart Summary Panel */}
                       {rankedResult.top_recommendation.summary_panel && (
-                        <div className="pt-4 border-t border-emerald-500/20">
+                        <div className="pt-4 border-t border-border">
                           <DecisionSummaryPanel
                             metrics={rankedResult.top_recommendation.summary_panel}
                             title="Optimal Cart Summary Metrics"
@@ -651,7 +651,7 @@ export default function WhatIfLabPage() {
                         variants={staggerItemVariants}
                         className={`rounded-2xl border transition-all overflow-hidden ${
                           isTop
-                            ? "border-emerald-500/60 bg-emerald-500/5 shadow-md"
+                            ? "border-amber-600/40 bg-amber-500/5 shadow-md"
                             : isEmpty
                             ? "border-dashed border-muted-foreground/40 bg-muted/20"
                             : "bg-card hover:bg-muted/10 shadow-xs"
@@ -665,9 +665,9 @@ export default function WhatIfLabPage() {
                         >
                           <div className="flex items-center gap-3.5 min-w-0 flex-1">
                             <span
-                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-mono font-black text-xs ${
+                              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-mono font-bold text-xs ${
                                 isTop
-                                  ? "bg-emerald-500 text-emerald-950 shadow-sm"
+                                  ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm"
                                   : isEmpty
                                   ? "bg-muted text-muted-foreground"
                                   : "bg-muted text-foreground"

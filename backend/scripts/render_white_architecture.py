@@ -1,0 +1,423 @@
+import os
+import shutil
+import subprocess
+import time
+from pathlib import Path
+
+ARTIFACT_DIR = Path(r"C:\Users\anknk\.gemini\antigravity\brain\e4a68fd5-c9b8-4166-b243-53401a90c575")
+FRONTEND_PUBLIC = Path(r"C:\Users\anknk\Desktop\Verdict-Ai_driven_purchase_engine\frontend\public")
+FRONTEND_PUBLIC.mkdir(parents=True, exist_ok=True)
+
+HTML_CONTENT = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Verdict System Architecture - Light Theme</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #ffffff;
+      color: #111827;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      padding: 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      width: 1400px;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 24px;
+      padding: 48px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 36px;
+    }
+    .header h1 {
+      font-size: 28px;
+      font-weight: 900;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      font-size: 14px;
+      color: #64748b;
+      margin-top: 6px;
+      font-weight: 500;
+    }
+
+    /* Diagram Nodes Styling */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+    
+    .node-pill {
+      background: #f8fafc;
+      border: 2px solid #cbd5e1;
+      border-radius: 14px;
+      padding: 12px 28px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #0f172a;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      text-align: center;
+    }
+
+    .node-primary {
+      background: #f0fdf4;
+      border: 2px solid #86efac;
+      color: #166534;
+    }
+
+    .node-brand {
+      background: #eff6ff;
+      border: 2px solid #93c5fd;
+      color: #1e40af;
+    }
+
+    .arrow-down {
+      width: 2px;
+      height: 24px;
+      background: #94a3b8;
+      position: relative;
+    }
+    .arrow-down::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: -4px;
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 7px solid #94a3b8;
+    }
+
+    /* Stages Container */
+    .stage-card {
+      width: 100%;
+      border-radius: 20px;
+      border: 2px solid #e2e8f0;
+      background: #ffffff;
+      padding: 24px 28px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+      position: relative;
+    }
+    .stage-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      color: #64748b;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .stage-title span.badge {
+      background: #f1f5f9;
+      padding: 3px 10px;
+      border-radius: 99px;
+      color: #0f172a;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .grid-6 {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 12px;
+    }
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .box-agent {
+      background: #fafafa;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+    .box-agent h4 {
+      font-size: 13px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .box-agent p {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+      line-height: 1.35;
+    }
+
+    .box-axis {
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+    }
+    .box-axis h5 {
+      font-size: 12px;
+      font-weight: 800;
+      color: #1e293b;
+    }
+    .box-axis span {
+      display: block;
+      font-size: 10px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .box-engine {
+      background: #fdf4ff;
+      border: 1.5px solid #f0abfc;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+    .box-engine h4 {
+      font-size: 13px;
+      font-weight: 800;
+      color: #86198f;
+    }
+    .box-engine p {
+      font-size: 11px;
+      color: #a21caf;
+      margin-top: 4px;
+    }
+
+    .box-delivery {
+      background: #f0fdf4;
+      border: 1.5px solid #86efac;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+    .box-delivery h4 {
+      font-size: 13px;
+      font-weight: 800;
+      color: #166534;
+    }
+    .box-delivery span {
+      display: block;
+      font-size: 10px;
+      font-family: monospace;
+      color: #15803d;
+      margin-top: 3px;
+    }
+
+    .vector-callout {
+      margin-top: 14px;
+      background: #fffbeb;
+      border: 1.5px solid #fde68a;
+      border-radius: 10px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #92400e;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container" id="capture-container">
+    <div class="header">
+      <h1>Verdict: System Architecture & Multi-Agent Decision Stack</h1>
+      <p>Cart-Level Counterfactual Purchase Decisions Powered by 4 Integrated Pipeline Stages</p>
+    </div>
+
+    <div class="flow">
+      <!-- Top Input -->
+      <div class="node-pill node-brand">
+        🛒 E-Commerce Cart (3–5 Candidate Items)
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <!-- Orchestrator -->
+      <div class="node-pill">
+        ⚡ Parallel Multi-Agent Intake Orchestrator
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <!-- STAGE 1 -->
+      <div class="stage-card">
+        <div class="stage-title">
+          <span>Stage 1: Multi-Agent Parallel Intake</span>
+          <span class="badge">&lt; 3.5s Execution</span>
+        </div>
+        <div class="grid-3">
+          <div class="box-agent">
+            <h4>👁️ Vision AI Agent (Gemini Pro)</h4>
+            <p>Extracts category, fabric weight, color palette, and formality index</p>
+          </div>
+          <div class="box-agent">
+            <h4>👗 Virtual Try-On Agent (YouCam)</h4>
+            <p>Renders body silhouette drape and extracts physical fit tightness signals</p>
+          </div>
+          <div class="box-agent">
+            <h4>🧠 Local CLIP Vector Agent</h4>
+            <p>Projects 512-dim visual embeddings to detect closet duplicate overlap</p>
+          </div>
+        </div>
+
+        <div class="vector-callout">
+          <span>🗄️ ChromaDB Vector Closet (24 Pre-Verified Seeded Wardrobe Items)</span>
+          <span>Cosine Distance &lt; 0.15 triggers Duplicate Overlap Warning</span>
+        </div>
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <!-- STAGE 2 -->
+      <div class="stage-card">
+        <div class="stage-title">
+          <span>Stage 2: Deterministic 6-Axis Decision Synthesis</span>
+          <span class="badge">&lt; 70ms In-Memory Math</span>
+        </div>
+        <div class="grid-6">
+          <div class="box-axis">
+            <h5>1. Redundancy</h5>
+            <span>100 − Dup%</span>
+          </div>
+          <div class="box-axis">
+            <h5>2. Versatility</h5>
+            <span>+Net Outfits</span>
+          </div>
+          <div class="box-axis">
+            <h5>3. Budget Impact</h5>
+            <span>Cost-Per-Wear</span>
+          </div>
+          <div class="box-axis">
+            <h5>4. Seasonality</h5>
+            <span>Current Timing</span>
+          </div>
+          <div class="box-axis">
+            <h5>5. Style Cohesion</h5>
+            <span>Aesthetic Fit</span>
+          </div>
+          <div class="box-axis">
+            <h5>6. Occasion Gap</h5>
+            <span>Lifestyle Need</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <!-- STAGE 3 -->
+      <div class="stage-card">
+        <div class="stage-title">
+          <span>Stage 3: Combinatorial &amp; Trade-Off Engines</span>
+          <span class="badge">&lt; 1.7s Optimization</span>
+        </div>
+        <div class="grid-3">
+          <div class="box-engine">
+            <h4>🧪 What-If Combinatorial Lab</h4>
+            <p>Evaluates all 2^N subsets (16 combinations for N=4) to find optimal synergy</p>
+          </div>
+          <div class="box-engine">
+            <h4>⚖️ Opportunity Cost Engine</h4>
+            <p>Computes outfit and financial deltas between 1 piece vs 2-item bundle</p>
+          </div>
+          <div class="box-engine">
+            <h4>🎯 Confidence Calibration Engine</h4>
+            <p>Calculates confidence tiers based on threshold distance and axis variance</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="arrow-down"></div>
+
+      <!-- STAGE 4 -->
+      <div class="stage-card">
+        <div class="stage-title">
+          <span>Stage 4: Client Delivery UI &amp; Decision Console</span>
+          <span class="badge">Next.js 14 Frontend</span>
+        </div>
+        <div class="grid-4">
+          <div class="box-delivery">
+            <h4>6-Axis Radar</h4>
+            <span>/verdict-test</span>
+          </div>
+          <div class="box-delivery">
+            <h4>Trade-Off Card</h4>
+            <span>/opportunity-cost</span>
+          </div>
+          <div class="box-delivery">
+            <h4>5-Metric Panel</h4>
+            <span>/dashboard</span>
+          </div>
+          <div class="box-delivery">
+            <h4>Verdict Concierge</h4>
+            <span>Grounded AI Chat</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>
+"""
+
+def main():
+    html_file = ARTIFACT_DIR / "architecture_diagram_white.html"
+    public_html = FRONTEND_PUBLIC / "architecture_diagram_white.html"
+    png_file = ARTIFACT_DIR / "architecture_diagram_white.png"
+    public_png = FRONTEND_PUBLIC / "architecture_diagram_white.png"
+
+    with open(html_file, "w", encoding="utf-8") as f:
+        f.write(HTML_CONTENT)
+    with open(public_html, "w", encoding="utf-8") as f:
+        f.write(HTML_CONTENT)
+
+    print(f"[OK] Saved HTML to {html_file}")
+
+    # Render to high-res PNG using headless Edge
+    edge_exe = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
+    if edge_exe.exists():
+        cmd = [
+            str(edge_exe),
+            "--headless",
+            "--disable-gpu",
+            f"--screenshot={str(png_file)}",
+            "--window-size=1600,1500",
+            f"file:///{str(html_file).replace(os.sep, '/')}"
+        ]
+        print("Rendering PNG with headless Edge...")
+        subprocess.run(cmd, check=True)
+        # Also copy to public
+        if png_file.exists():
+            import shutil
+            shutil.copy2(png_file, public_png)
+            print(f"[OK] High-resolution PNG saved to {png_file} and {public_png}")
+    else:
+        print("Edge binary not found at default location.")
+
+if __name__ == "__main__":
+    main()

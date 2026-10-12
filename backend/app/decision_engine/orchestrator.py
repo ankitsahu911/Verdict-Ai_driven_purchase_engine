@@ -47,7 +47,11 @@ def build_headline_reason(
 
     verdict_label = verdict.upper()
     best_axis = max(axes, key=lambda a: a.score)
-    worst_axis = min(axes, key=lambda a: a.score)
+    redundancy_axis = next((a for a in axes if a.axis == DecisionAxis.REDUNDANCY and a.score <= 15.0), None)
+    if redundancy_axis is not None:
+        worst_axis = redundancy_axis
+    else:
+        worst_axis = min(axes, key=lambda a: a.score)
     score_spread = best_axis.score - worst_axis.score
 
     # Edge Case 1: Single axis or identical best/worst axis
@@ -122,6 +126,14 @@ def synthesize_buy_score(
 
     overall_score = round(max(0.0, min(100.0, raw_weighted_score)), 1)
     verdict = map_score_to_verdict(overall_score)
+
+    # Duplicate Gating Override: If duplicate overlap is severe (redundancy score <= 15.0),
+    # clamp overall score below the SKIP threshold and enforce SKIP verdict.
+    redundancy_axis = next((a for a in axes if a.axis == DecisionAxis.REDUNDANCY), None)
+    if redundancy_axis and redundancy_axis.score <= 15.0:
+        overall_score = min(overall_score, 42.0)
+        verdict = Decision.SKIP.value
+
     headline = build_headline_reason(verdict, axes)
 
     weights_used = {

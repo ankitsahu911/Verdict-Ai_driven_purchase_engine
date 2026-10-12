@@ -100,6 +100,18 @@ def fetch_image_base64(image_url: str) -> str:
         # 2. Local file
         with open(image_url, "rb") as f:
             raw_bytes = f.read()
+    elif "/api/uploads/" in image_url:
+        fname = image_url.split("/api/uploads/")[-1]
+        local_p = Path(__file__).resolve().parent.parent.parent / "data" / "uploads" / fname
+        if local_p.exists():
+            with open(local_p, "rb") as f:
+                raw_bytes = f.read()
+        else:
+            import urllib3
+            urllib3.disable_warnings()
+            resp = requests.get(image_url, timeout=15, verify=False)
+            resp.raise_for_status()
+            raw_bytes = resp.content
     else:
         # 3. HTTP / HTTPS URL
         import urllib3
@@ -139,6 +151,17 @@ def _fetch_gemini_image_part(image_url: str):
     elif os.path.exists(image_url):
         with open(image_url, "rb") as f:
             raw_bytes = f.read()
+    elif "/api/uploads/" in image_url:
+        fname = image_url.split("/api/uploads/")[-1]
+        local_p = Path(__file__).resolve().parent.parent.parent / "data" / "uploads" / fname
+        if local_p.exists():
+            with open(local_p, "rb") as f:
+                raw_bytes = f.read()
+        else:
+            import urllib3
+            urllib3.disable_warnings()
+            resp = requests.get(image_url, timeout=15, verify=False)
+            raw_bytes = resp.content
     else:
         import urllib3
 
@@ -218,10 +241,11 @@ def call_gemini_vision(
         except Exception as err:
             last_err = err
             err_str = str(err)
-            if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+            if any(term in err_str for term in ("429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE", "500")):
                 logger.warning(
-                    "[Gemini Vision] Model %s hit 429 rate limit; trying alternate free tier model...",
+                    "[Gemini Vision] Model %s hit transient error (%s); trying alternate model...",
                     cur_model,
+                    err_str[:120],
                 )
                 time.sleep(1.0)
                 continue

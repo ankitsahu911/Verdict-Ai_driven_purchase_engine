@@ -1,11 +1,20 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export async function getAuthToken(): Promise<string | null> {
-  const { auth } = await import("./firebase");
-  if (!auth) return null;
-  const user = auth.currentUser;
-  if (!user) return null;
-  return user.getIdToken();
+  if (typeof window !== "undefined") {
+    if (localStorage.getItem("verdict_demo_token") === "true") {
+      return "demo-token";
+    }
+  }
+  try {
+    const { auth } = await import("./firebase");
+    if (auth && auth.currentUser) {
+      return await auth.currentUser.getIdToken();
+    }
+  } catch {
+    // Firebase not initialized
+  }
+  return "demo-token";
 }
 
 export async function apiFetch(path: string, options: RequestInit = {}) {
@@ -44,6 +53,7 @@ export interface UploadedWardrobeItem {
   filename: string;
   url: string;
   public_id: string;
+  price?: number | null;
 }
 
 export interface UploadFailure {
@@ -53,6 +63,7 @@ export interface UploadFailure {
 
 export interface UploadResponse {
   uploaded: UploadedWardrobeItem[];
+  items?: UploadedWardrobeItem[];
   failed: UploadFailure[];
 }
 
@@ -60,6 +71,7 @@ export function uploadWardrobePhoto(
   file: File,
   token: string,
   onProgress?: (percent: number) => void,
+  price?: number,
 ): Promise<UploadResponse> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -74,7 +86,13 @@ export function uploadWardrobePhoto(
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
-          resolve(JSON.parse(xhr.responseText) as UploadResponse);
+          const raw = JSON.parse(xhr.responseText);
+          const list = raw.items || raw.uploaded || [];
+          resolve({
+            uploaded: list,
+            items: list,
+            failed: raw.failed || [],
+          });
         } catch {
           reject(new Error("Invalid server response"));
         }
@@ -95,9 +113,17 @@ export function uploadWardrobePhoto(
     xhr.onerror = () => reject(new Error("Network error during upload"));
     xhr.onabort = () => reject(new Error("Upload aborted"));
 
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    if (token === "demo-token") {
+      xhr.setRequestHeader("X-Verdict-User", "demo");
+      xhr.setRequestHeader("Authorization", "Bearer demo-token");
+    } else {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
     const form = new FormData();
     form.append("files", file, file.name);
+    if (price !== undefined && price !== null && !isNaN(price)) {
+      form.append("price", String(price));
+    }
     xhr.send(form);
   });
 }
@@ -116,6 +142,7 @@ export interface GarmentAttributesData {
 export interface WardrobeItemData {
   id: number;
   cloudinary_url: string;
+  price?: number | null;
   uploaded_at: string;
   attributes: GarmentAttributesData | null;
 }
@@ -192,6 +219,7 @@ export interface CandidateEvaluationResult {
 export function evaluateCandidate(
   file: File,
   token: string,
+  price?: number,
   onProgress?: (percent: number) => void,
 ): Promise<CandidateEvaluationResult> {
   return new Promise((resolve, reject) => {
@@ -224,10 +252,28 @@ export function evaluateCandidate(
     xhr.onerror = () => reject(new Error("Network error during candidate evaluation"));
     xhr.onabort = () => reject(new Error("Evaluation upload aborted"));
 
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    if (token === "demo-token") {
+      xhr.setRequestHeader("X-Verdict-User", "demo");
+      xhr.setRequestHeader("Authorization", "Bearer demo-token");
+    } else {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
     const form = new FormData();
     form.append("file", file, file.name);
+    if (price !== undefined && price !== null && !isNaN(price)) {
+      form.append("price", String(price));
+    }
     xhr.send(form);
+  });
+}
+
+export async function updateWardrobePrice(
+  itemId: number,
+  price: number,
+): Promise<{ id: number; price: number }> {
+  return apiFetch(`/api/wardrobe/${itemId}/price`, {
+    method: "PATCH",
+    body: JSON.stringify({ price }),
   });
 }
 

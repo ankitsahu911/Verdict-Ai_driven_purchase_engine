@@ -43,32 +43,32 @@ export const AXIS_META: Record<
   versatility: {
     label: "Versatility",
     description: "How easily this item pairs into complete outfits with your current wardrobe",
-    iconColor: "text-blue-500",
+    iconColor: "text-amber-700 dark:text-amber-400",
   },
   redundancy: {
     label: "Uniqueness",
     description: "Wardrobe distinctness (higher is better; 100 minus duplicate risk %)",
-    iconColor: "text-purple-500",
+    iconColor: "text-amber-800 dark:text-amber-300",
   },
   seasonal_relevance: {
     label: "Timing",
     description: "Seasonal readiness — how immediately wearable this item is right now",
-    iconColor: "text-amber-500",
+    iconColor: "text-amber-600 dark:text-amber-400",
   },
   budget_impact: {
     label: "Value for Money",
     description: "Cost-per-wear efficiency and low return risk based on expected wears",
-    iconColor: "text-emerald-500",
+    iconColor: "text-amber-800 dark:text-amber-300",
   },
   style_alignment: {
     label: "Style Fit",
     description: "Alignment with your established personal wardrobe style",
-    iconColor: "text-indigo-500",
+    iconColor: "text-neutral-700 dark:text-neutral-300",
   },
   occasion_coverage: {
     label: "Wardrobe Gap",
     description: "Whether this item fills a missing occasion or expands your closet",
-    iconColor: "text-rose-500",
+    iconColor: "text-amber-700 dark:text-amber-400",
   },
 };
 
@@ -89,12 +89,12 @@ const VERDICT_CONFIG: Record<
   buy: {
     label: "BUY",
     badgeVariant: "buy",
-    badgeClass: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
-    bgGradient: "from-emerald-500/10 via-emerald-500/5 to-transparent",
-    chartColor: "#10b981",
+    badgeClass: "bg-amber-600/15 text-amber-800 dark:text-amber-200 border-amber-600/40",
+    bgGradient: "from-amber-600/12 via-amber-700/6 to-transparent",
+    chartColor: "#C29B38",
     gradientId: "radarGradient-buy",
     icon: CheckCircle2,
-    accentBorder: "border-emerald-500/30",
+    accentBorder: "border-amber-600/40",
     tagline: "High confidence addition to your wardrobe.",
   },
   consider: {
@@ -308,8 +308,8 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
                   <RadarChart cx="50%" cy="50%" outerRadius={isMobile ? "52%" : "68%"} data={radarData}>
                     <defs>
                       <linearGradient id="radarGradient-buy" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#10b981" stopOpacity={0.65} />
-                        <stop offset="100%" stopColor="#059669" stopOpacity={0.2} />
+                        <stop offset="0%" stopColor="#C29B38" stopOpacity={0.7} />
+                        <stop offset="100%" stopColor="#966B38" stopOpacity={0.25} />
                       </linearGradient>
                       <linearGradient id="radarGradient-consider" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.65} />
@@ -390,9 +390,9 @@ export function VerdictCard({ candidateId, initialData, className = "" }: Verdic
                   const isMedium = axisItem.score >= 45 && axisItem.score < 70;
 
                   const indicatorClass = isHigh
-                    ? "bg-emerald-500"
+                    ? "bg-amber-600 dark:bg-amber-500"
                     : isMedium
-                    ? "bg-amber-500"
+                    ? "bg-stone-500"
                     : "bg-rose-500";
 
                   return (

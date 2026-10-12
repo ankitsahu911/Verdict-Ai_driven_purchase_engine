@@ -123,10 +123,10 @@ function DashboardContent() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pb-16">
+    <main className="min-h-screen bg-background pb-16">
       <NavigationHeader currentSubtitle="Purchase Dashboard" badgeText="User Console" />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8">
         {/* User Hero Banner */}
         <motion.div
           initial="hidden"
@@ -135,11 +135,11 @@ function DashboardContent() {
           className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b"
         >
           <div>
-            <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider mb-1">
+            <div className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 font-bold text-xs uppercase tracking-[0.2em] mb-1.5">
               <LayoutDashboard className="h-4 w-4" />
               <span>Personal Console</span>
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-foreground">
+            <h1 className="font-serif text-3xl sm:text-5xl font-normal tracking-tight text-foreground">
               Decision Dashboard
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
@@ -160,9 +160,9 @@ function DashboardContent() {
               variant="outline"
               size="sm"
               onClick={handleLogout}
-              className="gap-1.5 text-xs font-semibold rounded-xl border-border"
+              className="h-10 px-4 gap-2 text-xs sm:text-sm font-semibold rounded-xl border-border hover:border-foreground/50 shadow-xs cursor-pointer"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <LogOut className="h-4 w-4" />
               Log Out
             </Button>
           </div>
@@ -185,7 +185,7 @@ function DashboardContent() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
                   <CardTitle className="text-base font-bold flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    <CheckCircle2 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                     Purchase Dashboard Metrics (M31)
                   </CardTitle>
                   <CardDescription className="text-xs text-muted-foreground">

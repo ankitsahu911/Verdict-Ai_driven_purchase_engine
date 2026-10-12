@@ -229,84 +229,50 @@ async def evaluate_candidate_item(
             logger.warning("[Candidate Intake] [Branch B] Try-On Agent failed (%.2fs): %s", dur / 1000.0, e)
             return {"success": False, "error": e}
 
-    # Branch C: Embedding Agent -> Immediate Duplicate Detection Pipeline
-    async def _run_embedding_and_duplicate():
-        # Step C1: Embedding Agent
+    # Branch C: Embedding Agent
+    async def _run_embedding_agent():
         t_emb0 = time.perf_counter()
-        logger.info("[Candidate Intake] [Branch C1] Embedding Agent started for item %s", item_id)
+        logger.info("[Candidate Intake] [Branch C] Embedding Agent started for item %s", item_id)
         emb_res = None
         emb_error = None
         try:
             emb_res = await asyncio.to_thread(generate_embedding, image_url)
             dur_emb = (time.perf_counter() - t_emb0) * 1000.0
             timings_data["embedding_agent_ms"] = round(dur_emb, 1)
-            logger.info("[Candidate Intake] [Branch C1] Embedding Agent completed in %.2fs", dur_emb / 1000.0)
+            logger.info("[Candidate Intake] [Branch C] Embedding Agent completed in %.2fs", dur_emb / 1000.0)
         except Exception as e:
             dur_emb = (time.perf_counter() - t_emb0) * 1000.0
             timings_data["embedding_agent_ms"] = round(dur_emb, 1)
-            logger.warning("[Candidate Intake] [Branch C1] Embedding Agent failed (%.2fs): %s", dur_emb / 1000.0, e)
+            logger.warning("[Candidate Intake] [Branch C] Embedding Agent failed (%.2fs): %s", dur_emb / 1000.0, e)
             emb_error = str(e)
-
-        # Step C2: Duplicate Detection - kicked off IMMEDIATELY after embedding is ready!
-        # Does NOT wait for Vision or Try-On to finish.
-        dup_res = None
-        dup_error = None
-        if emb_res is not None:
-            t_dup0 = time.perf_counter()
-            logger.info(
-                "[Candidate Intake] [Branch C2] Duplicate Detection started for item %s immediately upon embedding",
-                item_id,
-            )
-            try:
-                await asyncio.to_thread(
-                    upsert_wardrobe_embedding,
-                    item_id=item_id,
-                    user_id=owner.id,
-                    category="unknown",
-                    embedding=emb_res,
-                )
-                dup_res = await asyncio.to_thread(
-                    find_near_duplicate,
-                    query_embedding=emb_res,
-                    user_id=owner.id,
-                    exclude_item_id=item_id,
-                )
-                dur_dup = (time.perf_counter() - t_dup0) * 1000.0
-                timings_data["duplicate_detection_ms"] = round(dur_dup, 1)
-                logger.info("[Candidate Intake] [Branch C2] Duplicate Detection completed in %.2fs", dur_dup / 1000.0)
-            except Exception as e:
-                dur_dup = (time.perf_counter() - t_dup0) * 1000.0
-                timings_data["duplicate_detection_ms"] = round(dur_dup, 1)
-                logger.warning("[Candidate Intake] [Branch C2] Duplicate Detection failed (%.2fs): %s", dur_dup / 1000.0, e)
-                dup_error = str(e)
 
         return {
             "embedding": emb_res,
             "embedding_error": emb_error,
-            "duplicate": dup_res,
-            "duplicate_error": dup_error,
         }
 
     # Dispatch all 3 branches concurrently
     logger.info(
-        "[Candidate Intake] Dispatching concurrent agents (Vision, Try-On, Embedding->Duplicate) for item %s",
+        "[Candidate Intake] Dispatching concurrent agents (Vision, Try-On, Embedding) for item %s",
         item_id,
     )
     results = await asyncio.gather(
         _run_vision_agent(),
         _run_tryon_agent(),
-        _run_embedding_and_duplicate(),
+        _run_embedding_agent(),
         return_exceptions=False,
     )
-    vision_outcome, tryon_outcome, emb_dup_outcome = results
+    vision_outcome, tryon_outcome, emb_outcome = results
 
     # -------------------------------------------------------------------------
     # Main-Thread Database Updates (Thread-Safe SQLite Operations)
     # -------------------------------------------------------------------------
     # 1. Vision Agent Results
     attributes_res: dict | None = None
+    extracted_category: str | None = None
     if vision_outcome["success"]:
         extracted = vision_outcome["data"]
+        extracted_category = extracted.get("category")
         now = datetime.now(timezone.utc)
         attrs = GarmentAttributes(
             wardrobe_item_id=item_id,
@@ -331,18 +297,6 @@ async def evaluate_candidate_item(
             "material": attrs.material,
             "provider_used": extracted.get("provider_used", "gemini"),
         }
-
-        # Update ChromaDB category metadata now that vision analysis is complete
-        if emb_dup_outcome.get("embedding"):
-            try:
-                upsert_wardrobe_embedding(
-                    item_id=item_id,
-                    user_id=owner.id,
-                    category=attrs.category or "unknown",
-                    embedding=emb_dup_outcome["embedding"],
-                )
-            except Exception as e:
-                logger.warning("Failed updating ChromaDB category metadata: %s", e)
     else:
         errors["attributes"] = vision_outcome["error"]
 
@@ -377,15 +331,34 @@ async def evaluate_candidate_item(
         candidate_item.tryon_degraded = True
         tryon_res = fallback
 
-    # 3. Embedding & Duplicate Detection Results
-    if emb_dup_outcome.get("embedding_error"):
-        errors["embedding"] = emb_dup_outcome["embedding_error"]
+    # 3. Category-Aware Duplicate Detection Results
+    if emb_outcome.get("embedding_error"):
+        errors["embedding"] = emb_outcome["embedding_error"]
 
     duplicate_res: dict | None = None
-    if emb_dup_outcome.get("duplicate_error"):
-        errors["duplicate"] = emb_dup_outcome["duplicate_error"]
-
-    near_dup = emb_dup_outcome.get("duplicate")
+    near_dup = None
+    if emb_outcome.get("embedding"):
+        t_dup0 = time.perf_counter()
+        try:
+            near_dup = await asyncio.to_thread(
+                find_near_duplicate,
+                query_embedding=emb_outcome["embedding"],
+                user_id=owner.id,
+                exclude_item_id=item_id,
+                category=extracted_category,
+            )
+            dur_dup = (time.perf_counter() - t_dup0) * 1000.0
+            timings_data["duplicate_detection_ms"] = round(dur_dup, 1)
+            logger.info(
+                "[Candidate Intake] Category-aware duplicate detection completed in %.2fs (category: %s)",
+                dur_dup / 1000.0,
+                extracted_category,
+            )
+        except Exception as dup_err:
+            dur_dup = (time.perf_counter() - t_dup0) * 1000.0
+            timings_data["duplicate_detection_ms"] = round(dur_dup, 1)
+            logger.warning("[Candidate Intake] Duplicate Detection failed: %s", dup_err)
+            errors["duplicate"] = str(dup_err)
     if near_dup:
         matched_id = near_dup["wardrobe_item_id"]
         matched_item = db.query(WardrobeItem).filter(WardrobeItem.id == matched_id).first()
@@ -763,3 +736,33 @@ async def get_candidate_buy_score(
     )
 
     return result.model_dump()
+
+
+@router.get("/{candidate_id}/summary-panel")
+@router.get("/{candidate_id}/summary")
+async def get_candidate_summary_panel(
+    candidate_id: int,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    owner = get_or_create_user(db, user["uid"], user["email"])
+
+    candidate = db.query(WardrobeItem).filter(WardrobeItem.id == candidate_id).first()
+    if candidate is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Candidate item not found",
+        )
+    if candidate.user_id != owner.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this candidate item",
+        )
+
+    result = synthesize_buy_score(
+        candidate_item_id=candidate_id,
+        db=db,
+        persist=False,
+    )
+
+    return result.summary_panel

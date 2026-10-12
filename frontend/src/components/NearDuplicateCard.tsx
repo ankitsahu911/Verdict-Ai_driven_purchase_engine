@@ -37,15 +37,15 @@ export function NearDuplicateCard({
 
   if (!hasDuplicate || !match) {
     return (
-      <Card className={`border-emerald-500/30 bg-emerald-500/5 ${className}`}>
+      <Card className={`border-amber-600/30 bg-amber-600/5 ${className}`}>
         <CardContent className="flex items-center gap-3 p-4">
-          <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+          <CheckCircle2 className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
           <div className="flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              <span className="text-sm font-semibold text-amber-800 dark:text-amber-200">
                 Unique Addition
               </span>
-              <Badge variant="outline" className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400 text-[10px]">
+              <Badge variant="outline" className="border-amber-600/40 text-amber-800 dark:text-amber-200 text-[10px]">
                 No Duplicates
               </Badge>
             </div>

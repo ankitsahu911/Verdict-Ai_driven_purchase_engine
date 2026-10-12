@@ -33,9 +33,31 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+async def root():
+    return {
+        "status": "online",
+        "service": "Verdict AI Purchase Decision Engine Backend",
+        "version": "0.1.0",
+        "docs_url": "http://127.0.0.1:8000/docs",
+        "health_check": "http://127.0.0.1:8000/health",
+        "frontend_url": "http://localhost:3000",
+    }
+
+
+from fastapi.responses import HTMLResponse
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "verdict-backend"}
+
+
+@app.get("/database-evidence", response_class=HTMLResponse)
+async def get_database_evidence():
+    html_path = Path(__file__).resolve().parent.parent / "data" / "database_evidence_card.html"
+    if html_path.exists():
+        return html_path.read_text(encoding="utf-8")
+    return "<h1>Database evidence file not found</h1>"
 
 
 @app.get("/api/me")

@@ -278,11 +278,11 @@ export default function OpportunityCostPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pb-16">
+    <main className="min-h-screen bg-background pb-16">
       <NavigationHeader currentSubtitle="Opportunity Cost" badgeText="Comparison Engine" />
 
       {/* Main Container */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -382,11 +382,11 @@ export default function OpportunityCostPage() {
                         isPrimary
                           ? "border-dashed opacity-30 cursor-not-allowed bg-muted/20"
                           : isSelected
-                          ? "border-emerald-500 bg-emerald-500/10 shadow-md ring-2 ring-emerald-500/20 cursor-pointer"
+                          ? "border-amber-600 bg-amber-600/10 shadow-md ring-2 ring-amber-600/20 cursor-pointer"
                           : "border-border bg-card hover:border-muted-foreground/30 cursor-pointer"
                       }`}
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-600/10 text-amber-700 dark:text-amber-300">
                         <Shirt className="h-5 w-5" />
                       </div>
                       <div className="min-w-0">

@@ -153,7 +153,7 @@ export function DecisionSummaryPanel({
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Cost-Per-Wear
             </span>
-            <Coins className="h-4 w-4 text-emerald-500" />
+            <Coins className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           </div>
           <div>
             <div className="font-extrabold text-base text-foreground font-mono">
@@ -175,7 +175,7 @@ export function DecisionSummaryPanel({
             <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
               Sustainability
             </span>
-            <Leaf className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <Leaf className="h-4 w-4 text-amber-700 dark:text-amber-300" />
           </div>
           <div>
             <div className="flex items-center gap-1.5">

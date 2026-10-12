@@ -123,6 +123,7 @@ const SAMPLE_DEMO_RESULT: CandidateEvaluationResult = {
 
 export function CandidateEvaluator() {
   const [file, setFile] = useState<File | null>(null);
+  const [price, setPrice] = useState<string>("85.00");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentStage, setCurrentStage] = useState<number>(1);
@@ -158,14 +159,13 @@ export function CandidateEvaluator() {
     const timer3 = setTimeout(() => setCurrentStage(4), 8000);
 
     try {
-      const token = await getAuthToken();
+      let token = await getAuthToken();
       if (!token) {
-        throw new Error(
-          "Authentication token not found. Please log in or click 'Load Sample Evaluated Candidate' above to preview the full pipeline."
-        );
+        token = "demo-token";
       }
 
-      const res = await evaluateCandidate(file, token);
+      const numPrice = price ? parseFloat(price) : undefined;
+      const res = await evaluateCandidate(file, token, numPrice);
       setResult(res);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Candidate evaluation failed");
@@ -180,29 +180,29 @@ export function CandidateEvaluator() {
   return (
     <div className="space-y-8">
       {/* Upload & Controls Card */}
-      <Card className="border shadow-md bg-card">
-        <CardHeader className="pb-3 border-b bg-muted/10">
+      <Card className="border border-border/80 shadow-md bg-card rounded-2xl">
+        <CardHeader className="pb-3 border-b border-border/60 bg-muted/20">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <CardTitle className="flex items-center gap-2 text-base font-bold">
-              <Shirt className="h-5 w-5 text-primary" />
+            <CardTitle className="flex items-center gap-2.5 text-base sm:text-lg font-serif font-bold text-foreground">
+              <Shirt className="h-5 w-5 text-neutral-800 dark:text-neutral-200" />
               Add Candidate Garment
             </CardTitle>
             <Button
               variant="outline"
               size="sm"
               onClick={handleLoadDemo}
-              className="text-xs font-semibold gap-1.5 border-primary/30 text-primary hover:bg-primary/5 shadow-sm"
+              className="h-10 px-4 text-xs sm:text-sm font-semibold gap-2 border-border bg-card hover:bg-neutral-100 dark:hover:bg-neutral-800 text-foreground cursor-pointer shadow-xs rounded-xl"
             >
-              <Play className="h-3.5 w-3.5 fill-primary" />
+              <Play className="h-3.5 w-3.5 fill-foreground text-foreground" />
               Load Sample Evaluated Candidate
             </Button>
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row items-center gap-4">
-            <label className="flex-1 w-full flex items-center justify-center gap-3 border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 rounded-xl p-4 cursor-pointer transition-colors bg-muted/20">
+          <div className="flex flex-col lg:flex-row items-center gap-4">
+            <label className="flex-1 w-full flex items-center justify-center gap-3 border-2 border-dashed border-border hover:border-foreground/50 rounded-2xl p-4 cursor-pointer transition-colors bg-secondary/40 hover:bg-secondary/70">
               <Upload className="h-5 w-5 text-muted-foreground" />
-              <span className="text-sm font-medium text-muted-foreground">
+              <span className="text-sm font-medium text-foreground/80 truncate">
                 {file ? file.name : "Choose garment photo or screenshot..."}
               </span>
               <input
@@ -214,10 +214,27 @@ export function CandidateEvaluator() {
               />
             </label>
 
+            {/* Garment Price Input Field for Cost Per Wear */}
+            <div className="w-full lg:w-56 flex items-center rounded-2xl border-2 border-border bg-card px-4 py-3 gap-2 shadow-xs">
+              <span className="text-sm font-bold text-muted-foreground">$</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Cloth Price ($)"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                disabled={loading}
+                className="w-full bg-transparent text-sm font-bold text-foreground focus:outline-none"
+              />
+              <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">USD</span>
+            </div>
+
             <Button
               onClick={handleEvaluate}
               disabled={!file || loading}
-              className="w-full sm:w-auto px-6 font-bold"
+              size="lg"
+              className="w-full lg:w-auto h-12 px-8 font-bold text-sm sm:text-base tracking-wide bg-neutral-900 text-white hover:bg-black dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-md cursor-pointer rounded-2xl"
             >
               {loading ? "Evaluating Pipeline..." : "Run Evaluation"}
             </Button>
@@ -298,19 +315,44 @@ export function CandidateEvaluator() {
                 </p>
               </div>
             </div>
-            <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 font-bold text-xs px-3 py-1">
+            <Badge className="bg-amber-600/15 text-amber-800 dark:text-amber-200 border-amber-600/30 font-bold text-xs px-3 py-1 shadow-xs">
               <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
               Multi-Agent Evaluation Complete
             </Badge>
           </div>
 
+          {/* Cost-Per-Wear Real-Time Calculation Card */}
+          {price && parseFloat(price) > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl border border-border/80 bg-muted/20 shadow-xs">
+              <div className="space-y-0.5">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Cloth Retail Cost</span>
+                <p className="text-base sm:text-lg font-bold font-mono text-foreground">${parseFloat(price).toFixed(2)}</p>
+                <p className="text-[10px] text-muted-foreground">Original input price</p>
+              </div>
+              <div className="space-y-0.5 border-t sm:border-t-0 sm:border-l sm:pl-4 border-border/60">
+                <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Baseline Usage</span>
+                <p className="text-base sm:text-lg font-bold text-foreground">
+                  {result.attributes?.category === "outerwear" ? "15 wears/yr" : result.attributes?.category === "bottom" ? "35 wears/yr" : result.attributes?.category === "dress" ? "10 wears/yr" : "30 wears/yr"}
+                </p>
+                <p className="text-[10px] text-muted-foreground capitalize">{result.attributes?.category || "Standard"} category baseline</p>
+              </div>
+              <div className="space-y-0.5 border-t sm:border-t-0 sm:border-l sm:pl-4 border-border/60">
+                <span className="text-[10px] uppercase font-bold text-amber-800 dark:text-amber-300 tracking-wider">Cost-Per-Wear (CPW)</span>
+                <p className="text-base sm:text-lg font-black font-mono text-amber-700 dark:text-amber-400">
+                  ${(parseFloat(price) / (result.attributes?.category === "outerwear" ? 15 : result.attributes?.category === "bottom" ? 35 : result.attributes?.category === "dress" ? 10 : 30)).toFixed(2)} / wear
+                </p>
+                <p className="text-[10px] text-muted-foreground">Economic amortization index</p>
+              </div>
+            </div>
+          )}
+
           {/* 3 Component Results Grid (Vision, Try-On, Duplicate) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* 1. Garment Attributes Summary Card */}
             <Card className="flex flex-col border shadow-sm bg-card">
-              <CardHeader className="pb-3 border-b bg-purple-500/5">
-                <CardTitle className="flex items-center gap-2 text-sm font-bold text-purple-700 dark:text-purple-300">
-                  <Sparkles className="h-4 w-4 text-purple-500" />
+              <CardHeader className="pb-3 border-b bg-amber-600/5">
+                <CardTitle className="flex items-center gap-2 text-sm font-bold text-amber-900 dark:text-amber-200">
+                  <Sparkles className="h-4 w-4 text-amber-700 dark:text-amber-400" />
                   Vision Agent Attributes
                 </CardTitle>
               </CardHeader>
@@ -329,7 +371,7 @@ export function CandidateEvaluator() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-xl bg-amber-500/10 p-3 text-amber-600 text-xs">
+                  <div className="rounded-xl bg-amber-500/10 p-3 text-amber-700 dark:text-amber-300 text-xs font-medium">
                     Attributes extraction skipped: {result.errors?.attributes || "Unavailable"}
                   </div>
                 )}
@@ -338,16 +380,16 @@ export function CandidateEvaluator() {
 
             {/* 2. Virtual Try-On & Fit Signal Card */}
             <Card className="flex flex-col border shadow-sm bg-card">
-              <CardHeader className="pb-3 border-b bg-blue-500/5">
-                <CardTitle className="flex items-center gap-2 text-sm font-bold text-blue-700 dark:text-blue-300">
-                  <UserCheck className="h-4 w-4 text-blue-500" />
+              <CardHeader className="pb-3 border-b bg-neutral-900/5 dark:bg-white/5">
+                <CardTitle className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <UserCheck className="h-4 w-4 text-amber-700 dark:text-amber-400" />
                   Virtual Try-On & Fit Signal
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4 flex-1 space-y-3.5 text-xs">
                 {result.tryon ? (
                   <div className="space-y-3">
-                    {result.tryon.render_url ? (
+                    {result.tryon.render_url && !result.tryon.tryon_degraded && !result.tryon.render_url.includes("placehold.co") ? (
                       <div className="relative aspect-video w-full overflow-hidden rounded-xl border bg-muted/30 shadow-sm flex items-center justify-center">
                         <img
                           src={result.tryon.render_url}
@@ -356,25 +398,25 @@ export function CandidateEvaluator() {
                         />
                       </div>
                     ) : (
-                      <div className="p-4 rounded-xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 flex flex-col items-center justify-center text-center gap-2">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/15 text-blue-600">
+                      <div className="p-4 rounded-xl border-2 border-dashed border-amber-600/30 bg-amber-600/5 flex flex-col items-center justify-center text-center gap-2">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-600/15 text-amber-800 dark:text-amber-300">
                           <UserCheck className="h-6 w-6" />
                         </div>
                         <div>
-                          <p className="font-bold text-foreground text-xs">Virtual Try-On Analyzed</p>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">Silhouette & drape mapped to model</p>
+                          <p className="font-bold text-foreground text-xs">Virtual Fit & Drape Analyzed</p>
+                          <p className="text-[11px] text-muted-foreground mt-0.5">Physical silhouette & body drape mapped</p>
                         </div>
                       </div>
                     )}
 
                     <div className="flex flex-wrap gap-2">
                       {result.tryon.fit_tightness && (
-                        <Badge variant="outline" className="text-[11px] capitalize font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/20 px-2.5 py-0.5">
+                        <Badge variant="outline" className="text-[11px] capitalize font-bold bg-amber-600/10 text-amber-800 dark:text-amber-300 border-amber-600/20 px-2.5 py-0.5">
                           Tightness: {result.tryon.fit_tightness}
                         </Badge>
                       )}
                       {result.tryon.silhouette && (
-                        <Badge variant="outline" className="text-[11px] capitalize font-bold bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/20 px-2.5 py-0.5">
+                        <Badge variant="outline" className="text-[11px] capitalize font-bold bg-neutral-200/60 dark:bg-neutral-800/60 text-foreground border-border px-2.5 py-0.5">
                           Silhouette: {result.tryon.silhouette}
                         </Badge>
                       )}

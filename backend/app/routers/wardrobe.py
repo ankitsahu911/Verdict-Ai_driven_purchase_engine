@@ -4,9 +4,9 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -79,6 +79,7 @@ def _stream_to_temp(upload: UploadFile) -> tuple[str, int]:
 @router.post("/upload")
 async def upload_wardrobe_photos(
     files: List[UploadFile] = File(...),
+    price: Optional[float] = Form(None),
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -138,18 +139,40 @@ async def upload_wardrobe_photos(
                 user_id=owner.id,
                 cloudinary_url=cloud["url"],
                 cloudinary_public_id=cloud["public_id"],
+                price=price,
                 uploaded_at=datetime.now(timezone.utc),
             )
             db.add(item)
             db.commit()
             db.refresh(item)
 
+            category = "unknown"
+            try:
+                extracted = analyze_image(item.cloudinary_url)
+                category = extracted.get("category") or "unknown"
+                now = datetime.now(timezone.utc)
+                attrs = GarmentAttributes(
+                    wardrobe_item_id=item.id,
+                    category=category,
+                    color=extracted.get("color", "unknown"),
+                    pattern=extracted.get("pattern", "solid"),
+                    style=extracted.get("style", "casual"),
+                    season=extracted.get("season", "all-season"),
+                    material=extracted.get("material", "cotton"),
+                    extraction_source=ExtractionSource.AI,
+                    updated_at=now,
+                )
+                db.add(attrs)
+                db.commit()
+            except Exception as vis_err:
+                logger.warning("Attribute analysis failed for wardrobe item %s: %s", item.id, vis_err)
+
             try:
                 embedding = generate_embedding(item.cloudinary_url)
                 upsert_wardrobe_embedding(
                     item_id=item.id,
                     user_id=owner.id,
-                    category="unknown",
+                    category=category,
                     embedding=embedding,
                 )
             except Exception as emb_err:
@@ -164,6 +187,7 @@ async def upload_wardrobe_photos(
                 "filename": filename,
                 "cloudinary_url": item.cloudinary_url,
                 "cloudinary_public_id": item.cloudinary_public_id,
+                "price": item.price,
                 "uploaded_at": item.uploaded_at.isoformat(),
                 "size_bytes": size_bytes,
             })
@@ -184,11 +208,13 @@ async def upload_wardrobe_photos(
         "uploaded_count": len(successful),
         "failed_count": len(failed),
         "items": successful,
+        "uploaded": successful,
         "failed": failed,
     }
 
 
 @router.get("")
+@router.get("/items")
 async def list_wardrobe_items(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
@@ -214,6 +240,7 @@ async def list_wardrobe_items(
                 "id": item.id,
                 "cloudinary_url": item.cloudinary_url,
                 "cloudinary_public_id": item.cloudinary_public_id,
+                "price": item.price,
                 "uploaded_at": item.uploaded_at.isoformat(),
                 "attributes": (
                     {
@@ -258,6 +285,7 @@ async def get_wardrobe_item(
         "id": item.id,
         "cloudinary_url": item.cloudinary_url,
         "cloudinary_public_id": item.cloudinary_public_id,
+        "price": item.price,
         "uploaded_at": item.uploaded_at.isoformat(),
         "attributes": (
             {
@@ -273,6 +301,27 @@ async def get_wardrobe_item(
             else None
         ),
     }
+
+
+class PriceUpdateRequest(BaseModel):
+    price: float
+
+
+@router.patch("/{item_id}/price")
+async def update_item_price(
+    item_id: int,
+    payload: PriceUpdateRequest,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    owner = get_or_create_user(db, user["uid"], user["email"])
+    item = db.query(WardrobeItem).filter(WardrobeItem.id == item_id).first()
+    if not item or item.user_id != owner.id:
+        raise HTTPException(status_code=404, detail="Item not found")
+    item.price = payload.price
+    db.commit()
+    db.refresh(item)
+    return {"id": item.id, "price": item.price}
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)

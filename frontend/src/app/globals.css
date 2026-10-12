@@ -1,59 +1,130 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    /* Luxury Fashion Editorial Light Mode (Warm Ivory Linen / Lunora Fashion) */
+    --background: 38 30% 97.2%;      /* #FAF7F2 Warm Cream / Ivory Linen */
+    --foreground: 0 0% 9%;           /* #171717 Deep Obsidian Black */
+    --card: 0 0% 100%;               /* #FFFFFF Crisp Studio White */
+    --card-foreground: 0 0% 9%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --radius: 0.5rem;
+    --popover-foreground: 0 0% 9%;
+    --primary: 0 0% 9%;              /* #171717 Jet Black Primary */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF Crisp White Text */
+    --secondary: 38 24% 92.5%;       /* #F2ECE1 Warm Sand Stone */
+    --secondary-foreground: 0 0% 12%;
+    --muted: 38 20% 91.5%;           /* #EFE8DC Soft Oat */
+    --muted-foreground: 35 10% 43%;  /* #736B61 Warm Taupe Graphite */
+    --accent: 32 40% 48%;            /* #AD7E4A Warm Camel Leather */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 74% 54%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 37 18% 87%;            /* #E7E0D3 Subtle Warm Hairline */
+    --input: 37 18% 87%;
+    --ring: 0 0% 9%;
+    --radius: 0.95rem;
+
+    --brand-glow-1: rgba(212, 187, 155, 0.16);
+    --brand-glow-2: rgba(197, 168, 128, 0.14);
   }
 
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    /* Luxury Fashion Dark Mode (Espresso Charcoal / Obsidian) */
+    --background: 30 7% 7.8%;        /* #151312 Warm Deep Espresso */
+    --foreground: 38 22% 94%;        /* #F5F2EB Warm Silk Ivory */
+    --card: 30 7% 11.2%;             /* #1F1C1A Warm Graphite */
+    --card-foreground: 38 22% 94%;
+    --popover: 30 7% 11.2%;
+    --popover-foreground: 38 22% 94%;
+    --primary: 38 25% 95%;           /* #F7F4ED Crisp Cream */
+    --primary-foreground: 30 7% 7.8%;
+    --secondary: 30 7% 15%;          /* #2A2522 */
+    --secondary-foreground: 38 22% 94%;
+    --muted: 30 7% 16.5%;            /* #2E2925 */
+    --muted-foreground: 35 12% 66%;  /* #ADA69A */
+    --accent: 32 38% 58%;            /* #C59C68 Warm Honey Camel */
+    --accent-foreground: 30 7% 7.8%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 7% 20.5%;           /* #37322D Hairline Espresso */
+    --input: 30 7% 20.5%;
+    --ring: 38 25% 95%;
+
+    --brand-glow-1: rgba(197, 168, 128, 0.08);
+    --brand-glow-2: rgba(140, 109, 79, 0.08);
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans;
+    background-image: 
+      radial-gradient(circle at 12% -5%, var(--brand-glow-1), transparent 42rem),
+      radial-gradient(circle at 88% 10%, var(--brand-glow-2), transparent 38rem),
+      radial-gradient(circle at 50% 105%, var(--brand-glow-1), transparent 48rem);
+    background-attachment: fixed;
+    background-color: hsl(var(--background));
+    transition: background-color 0.25s ease, color 0.25s ease;
+    overflow-x: hidden;
   }
+  
+  h1, h2, h3, .font-serif {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+/* Custom Luxury Fashion UI Utilities */
+.glass-panel {
+  background: hsl(var(--card) / 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid hsl(var(--border) / 0.8);
+}
+
+.glass-panel-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel-hover:hover {
+  background: hsl(var(--card) / 0.98);
+  border-color: hsl(var(--foreground) / 0.3);
+  box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.brand-gradient-text {
+  background: linear-gradient(135deg, #141414 0%, #4D3C2E 50%, #8C6A48 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark .brand-gradient-text {
+  background: linear-gradient(135deg, #FFFFFF 0%, #EAE2D2 50%, #C4A482 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-gradient-bg {
+  background: linear-gradient(135deg, #181818 0%, #26221E 50%, #3B332B 100%);
+  color: #FFFFFF !important;
+}
+
+.dark .brand-gradient-bg {
+  background: linear-gradient(135deg, #EDE5D8 0%, #D8C8B0 50%, #BA9E78 100%);
+  color: #161413 !important;
+}
+
+/* Luxury Fashion Button & Badge Overrides */
+.fashion-badge {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 700;
 }

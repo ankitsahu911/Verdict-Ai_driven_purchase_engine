@@ -134,7 +134,7 @@ export function OpportunityCostCard({
                 {candidate_name}
               </span>
               , these two items would create{" "}
-              <span className="text-emerald-600 dark:text-emerald-400 font-extrabold px-2 py-0.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 inline-block">
+              <span className="text-amber-700 dark:text-amber-300 font-extrabold px-2 py-0.5 rounded-xl bg-amber-600/15 border border-amber-600/30 inline-block">
                 {alternative_bundle_outfit_count}
               </span>{" "}
               new outfit combinations.
@@ -143,7 +143,7 @@ export function OpportunityCostCard({
               {isVersatilityGain ? (
                 <>
                   That’s{" "}
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="font-bold text-amber-700 dark:text-amber-300">
                     +{outfit_count_delta} additional outfit{outfit_count_delta > 1 ? "s" : ""}
                   </span>{" "}
                   ({candidate_outfit_count} vs {alternative_bundle_outfit_count}) unlocked by choosing the alternative bundle.
@@ -164,7 +164,7 @@ export function OpportunityCostCard({
               <span
                 className={`font-mono text-sm ${
                   versatility_delta >= 0
-                    ? "text-emerald-600 dark:text-emerald-400"
+                    ? "text-amber-700 dark:text-amber-300"
                     : "text-rose-600 dark:text-rose-400"
                 }`}
               >
@@ -173,7 +173,7 @@ export function OpportunityCostCard({
             </div>
 
             <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-background border shadow-sm text-xs font-bold">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              <TrendingUp className="h-4 w-4 text-amber-600 dark:text-amber-400" />
               <span>Score Comparison:</span>
               <span className="font-mono text-sm text-foreground">
                 {candidate.overall_score.toFixed(1)} vs {alternative_bundle.overall_score.toFixed(1)}
@@ -272,11 +272,11 @@ export function OpportunityCostCard({
         </div>
 
         {/* RIGHT COLUMN: ALTERNATIVE BUNDLE */}
-        <Card className="lg:col-span-5 flex flex-col justify-between rounded-2xl border-2 border-emerald-500/40 shadow-md bg-gradient-to-br from-emerald-500/5 to-card p-6 space-y-6">
+        <Card className="lg:col-span-5 flex flex-col justify-between rounded-2xl border-2 border-amber-600/40 shadow-md bg-gradient-to-br from-amber-600/5 to-card p-6 space-y-6">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-emerald-500/20 mb-4">
+            <div className="flex items-center justify-between pb-3 border-b border-amber-600/20 mb-4">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-200">
                   Option B • 2-Item Alternative Bundle
                 </span>
               </div>
@@ -305,7 +305,7 @@ export function OpportunityCostCard({
                         className="h-14 w-14 rounded-xl object-cover border"
                       />
                     ) : (
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-amber-600/10 border border-amber-600/20 text-amber-700 dark:text-amber-300">
                         <Shirt className="h-7 w-7" />
                       </div>
                     )}
@@ -323,28 +323,28 @@ export function OpportunityCostCard({
             </p>
           </div>
 
-          <div className="space-y-3 pt-3 border-t border-emerald-500/20">
+          <div className="space-y-3 pt-3 border-t border-amber-600/20">
             <div className="flex items-center justify-between text-xs font-bold">
               <span className="text-muted-foreground">Bundle Overall Score</span>
-              <span className="font-mono text-base font-black text-emerald-600 dark:text-emerald-400">
+              <span className="font-mono text-base font-black text-amber-700 dark:text-amber-300">
                 {alternative_bundle.overall_score.toFixed(1)} / 100
               </span>
             </div>
             <Progress
               value={alternative_bundle.overall_score}
               className="h-2"
-              indicatorClassName="bg-emerald-500"
+              indicatorClassName="bg-amber-600 dark:bg-amber-500"
             />
 
             <div className="flex items-center justify-between text-xs pt-1">
               <span className="text-muted-foreground font-medium">Outfits Enabled:</span>
-              <span className="font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+              <span className="font-bold text-amber-700 dark:text-amber-300 font-mono">
                 {alternative_bundle_outfit_count} combinations ({outfit_count_delta >= 0 ? `+${outfit_count_delta}` : outfit_count_delta})
               </span>
             </div>
 
             {/* Milestone 31: 5-Metric Decision Summary Panel */}
-            <div className="pt-4 border-t border-emerald-500/20">
+            <div className="pt-4 border-t border-amber-600/20">
               <DecisionSummaryPanel
                 metrics={bundleSummaryMetrics}
                 variant="compact"

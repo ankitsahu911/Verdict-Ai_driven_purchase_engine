@@ -49,7 +49,17 @@ def generate_embedding(image_url_or_path: str) -> list[float]:
         raise EmbeddingServiceError("No image URL or file path provided.")
 
     try:
-        if image_url_or_path.startswith("http://") or image_url_or_path.startswith("https://"):
+        if "/api/uploads/" in image_url_or_path:
+            filename = image_url_or_path.split("/api/uploads/")[-1]
+            local_uploads_path = Path(__file__).resolve().parent.parent.parent / "data" / "uploads" / filename
+            if local_uploads_path.exists():
+                image = Image.open(local_uploads_path).convert("RGB")
+            else:
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                resp = requests.get(image_url_or_path, headers=headers, timeout=15, verify=False)
+                resp.raise_for_status()
+                image = Image.open(io.BytesIO(resp.content)).convert("RGB")
+        elif image_url_or_path.startswith("http://") or image_url_or_path.startswith("https://"):
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
             resp = requests.get(image_url_or_path, headers=headers, timeout=15, verify=False)
             resp.raise_for_status()

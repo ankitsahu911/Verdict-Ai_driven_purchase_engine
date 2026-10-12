@@ -53,6 +53,6 @@ def upload_image(file_path: str | Path, public_id: str | None = None) -> dict:
         dest_path = uploads_dir / filename
         shutil.copyfile(str(file_path), str(dest_path))
         return {
-            "url": str(dest_path),
+            "url": f"http://localhost:8000/api/uploads/{filename}",
             "public_id": public_id or filename,
         }

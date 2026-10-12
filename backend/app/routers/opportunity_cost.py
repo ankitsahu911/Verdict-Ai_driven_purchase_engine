@@ -54,6 +54,7 @@ def _format_item_name(item: WardrobeItem | None, default_id: int) -> str:
 
 
 @router.post("/compare", response_model=OpportunityCostCompareResponse)
+@router.post("/evaluate", response_model=OpportunityCostCompareResponse)
 async def compare_opportunity_cost(
     payload: OpportunityCostCompareRequest,
     user: dict = Depends(get_current_user),

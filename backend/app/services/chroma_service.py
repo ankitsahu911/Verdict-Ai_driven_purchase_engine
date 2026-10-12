@@ -28,6 +28,25 @@ def get_wardrobe_collection():
     )
 
 
+def normalize_category(cat: str | None) -> str | None:
+    if not cat:
+        return None
+    c = cat.lower().strip()
+    if c in ("jacket", "coat", "overcoat", "blazer", "vest", "hoodie", "outerwear", "parka", "cardigan"):
+        return "outerwear"
+    if c in ("top", "shirt", "tee", "t-shirt", "blouse", "sweater", "polo"):
+        return "top"
+    if c in ("bottom", "pants", "trousers", "jeans", "shorts", "skirt", "chinos"):
+        return "bottom"
+    if c in ("dress", "gown", "frock"):
+        return "dress"
+    if c in ("footwear", "shoes", "sneakers", "boots", "loafers", "heels"):
+        return "footwear"
+    if c in ("accessory", "belt", "scarf", "hat", "bag"):
+        return "accessory"
+    return c
+
+
 def upsert_wardrobe_embedding(
     item_id: int,
     user_id: int,
@@ -36,9 +55,10 @@ def upsert_wardrobe_embedding(
 ) -> None:
     collection = get_wardrobe_collection()
     doc_id = str(item_id)
+    norm_cat = normalize_category(category) or "unknown"
     metadata = {
         "user_id": int(user_id),
-        "category": str(category or "unknown"),
+        "category": str(norm_cat),
     }
 
     collection.upsert(
@@ -73,11 +93,19 @@ def query_similar_items(
         logger.warning("ChromaDB count check failed: %s", e)
         return []
 
-    where_filter = {}
+    clauses = []
     if user_id is not None:
-        where_filter["user_id"] = int(user_id)
-    if category is not None:
-        where_filter["category"] = str(category)
+        clauses.append({"user_id": int(user_id)})
+    
+    norm_cat = normalize_category(category)
+    if norm_cat and norm_cat != "unknown":
+        clauses.append({"category": norm_cat})
+
+    where_filter = {}
+    if len(clauses) == 1:
+        where_filter = clauses[0]
+    elif len(clauses) > 1:
+        where_filter = {"$and": clauses}
 
     fetch_k = top_k + 1 if exclude_item_id is not None else top_k
 
@@ -138,11 +166,13 @@ def find_near_duplicate(
     query_embedding: list[float],
     user_id: int,
     exclude_item_id: int | None = None,
+    category: str | None = None,
 ) -> dict | None:
     matches = query_similar_items(
         query_embedding=query_embedding,
         top_k=1,
         user_id=user_id,
+        category=category,
         exclude_item_id=exclude_item_id,
     )
     if not matches:

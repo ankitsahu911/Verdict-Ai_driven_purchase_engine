@@ -210,11 +210,11 @@ export default function VerdictTestPage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20 pb-16">
+    <main className="min-h-screen bg-background pb-16">
       <NavigationHeader currentSubtitle="Verdict Visualizer" badgeText="Decision Engine" />
 
       {/* Main Full-Frame Content */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8">
         {/* Page Hero Title & Description */}
         <motion.div
           initial="hidden"
@@ -247,7 +247,7 @@ export default function VerdictTestPage() {
                 <Button
                   variant={selectedDemo === "buy" ? "default" : "outline"}
                   size="sm"
-                  className={selectedDemo === "buy" ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm" : "font-semibold"}
+                  className={selectedDemo === "buy" ? "bg-amber-600 hover:bg-amber-700 text-white font-bold shadow-sm" : "font-semibold"}
                   onClick={() => handleSelectDemo("buy")}
                 >
                   BUY (82.5)

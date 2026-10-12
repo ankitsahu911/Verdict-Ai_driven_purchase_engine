@@ -43,6 +43,7 @@ interface UploadItem {
   size: number;
   status: Status;
   progress: number;
+  price?: number;
   error?: string;
   result?: UploadedWardrobeItem;
 }
@@ -75,7 +76,7 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export function PhotoUploader() {
+export function PhotoUploader({ onUploadComplete }: { onUploadComplete?: () => void } = {}) {
   const [items, setItems] = useState<UploadItem[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -101,6 +102,7 @@ export function PhotoUploader() {
         size: file.size,
         status: error ? "error" : "pending",
         progress: 0,
+        price: undefined,
         error: error ?? undefined,
       });
     });
@@ -144,15 +146,19 @@ export function PhotoUploader() {
         const item = pending[nextIndex++];
         try {
           patchItem(item.id, { status: "uploading", progress: 0, error: undefined });
-          const res = await uploadWardrobePhoto(item.file, token, (percent) =>
-            patchItem(item.id, { progress: percent }),
+          const res = await uploadWardrobePhoto(
+            item.file,
+            token,
+            (percent) => patchItem(item.id, { progress: percent }),
+            item.price,
           );
-          const result = res.uploaded[0];
+          const list = res.uploaded || (res as any).items || [];
+          const result = list[0];
           if (result) {
             patchItem(item.id, { status: "done", progress: 100, result });
           } else {
             const message =
-              res.failed[0]?.error ?? "Upload failed. Please try again.";
+              res.failed?.[0]?.error ?? "Upload failed. Please try again.";
             patchItem(item.id, { status: "error", error: message });
           }
         } catch (err) {
@@ -171,7 +177,10 @@ export function PhotoUploader() {
     );
     await Promise.all(workers);
     setUploading(false);
-  }, [items, patchItem]);
+    if (onUploadComplete) {
+      onUploadComplete();
+    }
+  }, [items, patchItem, onUploadComplete]);
 
   const clearFinished = useCallback(() => {
     setItems((prev) =>
@@ -301,21 +310,37 @@ export function PhotoUploader() {
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                  <div className="space-y-1 p-2">
-                    <p className="truncate text-xs font-medium" title={item.name}>
+                  <div className="space-y-1.5 p-2.5">
+                    <p className="truncate text-xs font-semibold text-foreground" title={item.name}>
                       {item.name}
                     </p>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-muted-foreground">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Garment Cost ($)"
+                        value={item.price ?? ""}
+                        onChange={(e) => {
+                          const val = e.target.value === "" ? undefined : parseFloat(e.target.value);
+                          patchItem(item.id, { price: val });
+                        }}
+                        disabled={item.status === "uploading" || item.status === "done"}
+                        className="w-full text-xs px-2 py-1 rounded-lg border border-border bg-background focus:ring-1 focus:ring-neutral-900 focus:outline-none dark:focus:ring-white"
+                      />
+                    </div>
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                       <span>{formatBytes(item.size)}</span>
                       {item.status === "pending" && <span>Ready</span>}
                       {item.status === "uploading" && <span>Uploading…</span>}
                       {item.status === "done" && (
-                        <span className="flex items-center gap-1 text-green-600">
+                        <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold">
                           <CheckCircle2 className="h-3 w-3" /> Saved
                         </span>
                       )}
                       {item.status === "error" && (
-                        <span className="flex items-center gap-1 text-red-600">
+                        <span className="flex items-center gap-1 text-destructive font-semibold">
                           <AlertCircle className="h-3 w-3" /> Failed
                         </span>
                       )}

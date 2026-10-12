@@ -5,26 +5,26 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2.5 whitespace-nowrap rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98] cursor-pointer [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+          "bg-neutral-900 text-white shadow-md hover:bg-black hover:shadow-lg dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+          "bg-destructive text-destructive-foreground shadow hover:bg-destructive/90",
         outline:
-          "border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground",
+          "border-2 border-neutral-300 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90 text-foreground shadow-xs hover:border-neutral-900 dark:hover:border-white hover:bg-neutral-100/60 dark:hover:bg-neutral-800/60",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-secondary text-secondary-foreground border border-border/80 shadow-xs hover:bg-secondary/80",
+        ghost: "hover:bg-neutral-100 dark:hover:bg-neutral-800 text-foreground",
+        link: "text-foreground underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-9 w-9",
+        default: "h-11 px-6 py-2.5 text-sm sm:text-base tracking-wide",
+        sm: "h-9.5 px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg tracking-wide",
+        lg: "h-13 px-8 py-3.5 text-base sm:text-lg font-bold tracking-wide rounded-2xl shadow-md",
+        icon: "h-11 w-11 rounded-xl",
       },
     },
     defaultVariants: {
