@@ -29,6 +29,7 @@ from app.services.tryon_service import (
     TryOnServiceError,
     TryOnTimeoutError,
     build_tryon_fallback,
+    display_tryon_error,
     generate_tryon,
 )
 from verdict_backend.main import app
@@ -42,6 +43,13 @@ class TestMilestone33GracefulDegradation(unittest.TestCase):
         """Verify custom timeout and connection errors inherit from TryOnServiceError."""
         self.assertTrue(issubclass(TryOnTimeoutError, TryOnServiceError))
         self.assertTrue(issubclass(TryOnConnectionError, TryOnServiceError))
+
+    def test_credit_error_has_a_clean_user_message(self):
+        message = display_tryon_error(
+            'HTTP 400: {"error_code":"CreditInsufficient"}'
+        )
+        self.assertIn("credits are exhausted", message)
+        self.assertNotIn("error_code", message)
 
     @patch.dict(os.environ, {"YOUCAM_API_KEY": "test_key", "YOUCAM_SRC_URL": "https://example.com/src.jpg"})
     @patch("requests.post")

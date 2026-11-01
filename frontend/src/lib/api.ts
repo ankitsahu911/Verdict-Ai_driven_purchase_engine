@@ -228,6 +228,8 @@ export function evaluateCandidate(
   file: File,
   token: string,
   price?: number,
+  garmentCategory?: string,
+  garmentColor?: string,
   onProgress?: (percent: number) => void,
 ): Promise<CandidateEvaluationResult> {
   return new Promise((resolve, reject) => {
@@ -270,6 +272,12 @@ export function evaluateCandidate(
     form.append("file", file, file.name);
     if (price !== undefined && price !== null && !isNaN(price)) {
       form.append("price", String(price));
+    }
+    if (garmentCategory) {
+      form.append("garment_category", garmentCategory);
+    }
+    if (garmentColor) {
+      form.append("garment_color", garmentColor);
     }
     xhr.send(form);
   });

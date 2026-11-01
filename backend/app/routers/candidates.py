@@ -24,12 +24,16 @@ from app.models import ExtractionSource, GarmentAttributes, WardrobeItem
 from app.routers.wardrobe import _file_is_allowed, _stream_to_temp, get_or_create_user
 from app.services.chroma_service import find_near_duplicate, upsert_wardrobe_embedding
 from app.services.cloudinary_service import upload_image
-from app.services.duplicate_matching import attribute_duplicate_score
+from app.services.duplicate_matching import (
+    attribute_duplicate_score,
+    attributes_are_duplicate_compatible,
+)
 from app.services.economics_service import (
     calculate_cost_per_wear,
     calculate_return_risk,
 )
 from app.services.embedding_service import generate_embedding
+from app.services.image_color import photos_have_compatible_colours
 from app.services.outfit_service import (
     build_ranked_outfit_combinations,
     find_compatible_items,
@@ -44,6 +48,18 @@ router = APIRouter(prefix="/api/candidates", tags=["candidates"])
 PIPELINE_RESPONSE_BUDGET_SEC = float(
     os.getenv("CANDIDATE_EVALUATION_TIMEOUT_SEC", "12")
 )
+ALLOWED_GARMENT_CATEGORIES = {
+    "top",
+    "bottom",
+    "outerwear",
+    "dress",
+    "footwear",
+    "accessory",
+}
+ALLOWED_MANUAL_COLOURS = {
+    "black", "white", "grey", "blue", "brown", "beige", "green", "red",
+    "yellow", "orange", "purple", "pink", "multicolour",
+}
 
 
 def _find_attribute_duplicate(
@@ -83,6 +99,56 @@ def _find_attribute_duplicate(
             "metadata": {"attribute_reason": reason},
         }
     return best_match
+
+
+def _reconcile_duplicate_match(
+    candidate_attributes: dict | None,
+    visual_match: dict | None,
+    owner_id: int,
+    db: Session,
+    candidate_url: str | None = None,
+) -> dict | None:
+    """Combine visual search with clothing attributes instead of trusting pixels alone."""
+    if not candidate_attributes:
+        # A visual-only hit is not enough to warn a user away from a purchase.
+        # Prefer a false negative while the vision provider is unavailable.
+        return None
+
+    attribute_match = _find_attribute_duplicate(candidate_attributes, owner_id, db)
+    if attribute_match:
+        attribute_item = (
+            db.query(WardrobeItem)
+            .filter(WardrobeItem.id == attribute_match["wardrobe_item_id"])
+            .first()
+        )
+        if attribute_item and not photos_have_compatible_colours(
+            candidate_url, attribute_item.cloudinary_url
+        ):
+            attribute_match = None
+    compatible_visual = None
+    if visual_match:
+        visual_item = (
+            db.query(WardrobeItem)
+            .filter(WardrobeItem.id == visual_match["wardrobe_item_id"])
+            .first()
+        )
+        visual_attributes = getattr(visual_item, "attributes", None)
+        if visual_item and visual_attributes and attributes_are_duplicate_compatible(
+            candidate_attributes,
+            {
+                "category": visual_attributes.category,
+                "color": visual_attributes.color,
+            },
+        ) and photos_have_compatible_colours(candidate_url, visual_item.cloudinary_url):
+            compatible_visual = visual_match
+
+    if attribute_match and (
+        not compatible_visual
+        or attribute_match["similarity_percentage"]
+        >= compatible_visual["similarity_percentage"]
+    ):
+        return attribute_match
+    return compatible_visual
 
 
 @router.get("")
@@ -133,11 +199,25 @@ async def list_candidate_items(
 async def evaluate_candidate_item(
     file: UploadFile = File(...),
     price: float | None = Form(None),
+    garment_category: str | None = Form(None),
+    garment_color: str | None = Form(None),
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     owner = get_or_create_user(db, user["uid"], user["email"])
     filename = file.filename or "candidate.jpg"
+    manual_category = (garment_category or "").strip().lower() or None
+    manual_color = (garment_color or "").strip().lower() or None
+    if manual_category and manual_category not in ALLOWED_GARMENT_CATEGORIES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unsupported garment category.",
+        )
+    if manual_color and manual_color not in ALLOWED_MANUAL_COLOURS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unsupported garment colour.",
+        )
 
     if not _file_is_allowed(file.content_type or "", filename):
         raise HTTPException(
@@ -371,12 +451,12 @@ async def evaluate_candidate_item(
     extracted_category: str | None = None
     if vision_outcome["success"]:
         extracted = vision_outcome["data"]
-        extracted_category = extracted.get("category")
+        extracted_category = manual_category or extracted.get("category")
         now = datetime.now(timezone.utc)
         attrs = GarmentAttributes(
             wardrobe_item_id=item_id,
-            category=extracted.get("category"),
-            color=extracted.get("color"),
+            category=extracted_category,
+            color=manual_color or extracted.get("color"),
             pattern=extracted.get("pattern"),
             style=extracted.get("style"),
             season=extracted.get("season"),
@@ -436,15 +516,13 @@ async def evaluate_candidate_item(
 
     duplicate_res: dict | None = None
 
-    attribute_duplicate = None
-    if attributes_res:
-        attribute_duplicate = _find_attribute_duplicate(attributes_res, owner.id, db)
-        if attribute_duplicate and (
-            not near_dup
-            or attribute_duplicate["similarity_percentage"]
-            > near_dup["similarity_percentage"]
-        ):
-            near_dup = attribute_duplicate
+    near_dup = _reconcile_duplicate_match(
+        attributes_res,
+        near_dup,
+        owner.id,
+        db,
+        candidate_item.cloudinary_url,
+    )
     if near_dup:
         matched_id = near_dup["wardrobe_item_id"]
         matched_item = db.query(WardrobeItem).filter(WardrobeItem.id == matched_id).first()

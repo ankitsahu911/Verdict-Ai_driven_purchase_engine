@@ -100,6 +100,11 @@ export function NearDuplicateCard({
             <p className="text-[11px] text-muted-foreground mt-1">
               Closest Wardrobe Item: <code className="rounded bg-muted px-1.5 py-0.5 font-mono font-bold">#{match.wardrobe_item_id}</code>
             </p>
+            {match.message && (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {match.message}
+              </p>
+            )}
           </div>
         </div>
       </CardContent>

@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   Scan,
   Compass,
+  ChevronDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,88 @@ const STAGES = [
   { id: 3, label: "Generating virtual try-on & fit signals...", icon: UserCheck },
   { id: 4, label: "Checking wardrobe for near-duplicates...", icon: Layers },
 ];
+
+const GARMENT_CATEGORY_OPTIONS = [
+  { value: "", label: "AI auto-detect" },
+  { value: "top", label: "Top / Shirt" },
+  { value: "bottom", label: "Bottom / Trousers / Jeans" },
+  { value: "outerwear", label: "Outerwear / Jacket" },
+  { value: "dress", label: "Dress" },
+  { value: "footwear", label: "Footwear / Shoes" },
+  { value: "accessory", label: "Accessory" },
+];
+
+const GARMENT_COLOUR_OPTIONS = [
+  { value: "", label: "AI auto-detect" },
+  { value: "black", label: "Black" },
+  { value: "white", label: "White" },
+  { value: "grey", label: "Grey" },
+  { value: "blue", label: "Blue" },
+  { value: "brown", label: "Brown" },
+  { value: "beige", label: "Beige / Tan" },
+  { value: "green", label: "Green" },
+  { value: "red", label: "Red" },
+  { value: "yellow", label: "Yellow" },
+  { value: "orange", label: "Orange" },
+  { value: "purple", label: "Purple" },
+  { value: "pink", label: "Pink" },
+  { value: "multicolour", label: "Multicolour" },
+];
+
+interface ChoicePickerProps {
+  label: string;
+  value: string;
+  options: { value: string; label: string }[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}
+
+function ChoicePicker({ label, value, options, disabled = false, onChange }: ChoicePickerProps) {
+  const [open, setOpen] = useState(false);
+  const selected = options.find((option) => option.value === value) ?? options[0];
+
+  return (
+    <div className="relative w-full">
+      <span className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </span>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((isOpen) => !isOpen)}
+        className="flex h-10 w-full items-center justify-between rounded-lg border border-border bg-card px-3 text-left text-sm font-semibold text-foreground shadow-xs transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <span className="truncate">{selected.label}</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          aria-label={label}
+          className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-lg"
+        >
+          {options.map((option) => (
+            <button
+              key={option.value || "auto"}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+              className={`block w-full rounded-md px-2.5 py-2 text-left text-sm transition-colors ${option.value === value ? "bg-secondary font-bold text-foreground" : "text-muted-foreground hover:bg-secondary/70 hover:text-foreground"}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const SAMPLE_BUY_SCORE_DEMO: BuyScoreResultData = {
   candidate_id: 101,
@@ -129,6 +212,8 @@ const SAMPLE_DEMO_RESULT: CandidateEvaluationResult = {
 export function CandidateEvaluator() {
   const [file, setFile] = useState<File | null>(null);
   const [price, setPrice] = useState<string>("85.00");
+  const [garmentCategory, setGarmentCategory] = useState("");
+  const [garmentColor, setGarmentColor] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentStage, setCurrentStage] = useState<number>(1);
@@ -185,7 +270,7 @@ export function CandidateEvaluator() {
       }
 
       const numPrice = price ? parseFloat(price) : undefined;
-      const res = await evaluateCandidate(file, token, numPrice);
+      const res = await evaluateCandidate(file, token, numPrice, garmentCategory, garmentColor);
       setResult(res);
       setPreviewUrl(res.cloudinary_url || previewUrl);
       saveEvaluationSession(res, price);
@@ -233,7 +318,7 @@ export function CandidateEvaluator() {
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
-          <div className="flex flex-col lg:flex-row items-center gap-4">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_12rem_10rem_13rem_auto] lg:items-end">
             <label className="flex-1 w-full flex items-center justify-center gap-3 border-2 border-dashed border-border hover:border-foreground/50 rounded-2xl p-4 cursor-pointer transition-colors bg-secondary/40 hover:bg-secondary/70">
               <Upload className="h-5 w-5 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground/80 truncate">
@@ -248,8 +333,24 @@ export function CandidateEvaluator() {
               />
             </label>
 
+            <ChoicePicker
+              label="Garment type"
+              value={garmentCategory}
+              options={GARMENT_CATEGORY_OPTIONS}
+              disabled={loading}
+              onChange={setGarmentCategory}
+            />
+
+            <ChoicePicker
+              label="Dominant colour"
+              value={garmentColor}
+              options={GARMENT_COLOUR_OPTIONS}
+              disabled={loading}
+              onChange={setGarmentColor}
+            />
+
             {/* Garment Price Input Field for Cost Per Wear */}
-            <div className="w-full lg:w-56 flex items-center rounded-2xl border-2 border-border bg-card px-4 py-3 gap-2 shadow-xs">
+            <div className="w-full flex items-center rounded-2xl border-2 border-border bg-card px-4 py-3 gap-2 shadow-xs">
               <span className="text-sm font-bold text-muted-foreground">$</span>
               <input
                 type="number"
@@ -273,6 +374,10 @@ export function CandidateEvaluator() {
               {loading ? "Evaluating Pipeline..." : "Run Evaluation"}
             </Button>
           </div>
+
+          <p className="text-xs text-muted-foreground">
+            For a photo with several garments, select the item and its dominant colour you want evaluated.
+          </p>
 
           {previewUrl && !loading && !result && (
             <div className="relative aspect-video max-h-48 w-full max-w-xs overflow-hidden rounded-xl border bg-muted mx-auto shadow-sm">

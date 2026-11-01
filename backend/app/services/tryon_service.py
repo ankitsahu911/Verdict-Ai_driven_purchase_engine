@@ -36,6 +36,18 @@ DEFAULT_TRYON_PLACEHOLDER_URL = (
 )
 
 
+def display_tryon_error(error_reason: str) -> str:
+    """Keep provider payloads out of the UI while retaining clear next steps."""
+    normalized = error_reason.lower()
+    if "creditinsufficient" in normalized or "enough credits" in normalized:
+        return "YouCam credits are exhausted, so a virtual render could not be generated."
+    if "timed out" in normalized:
+        return "The virtual try-on service took too long to respond."
+    if "connect" in normalized or "unreachable" in normalized:
+        return "The virtual try-on service is temporarily unreachable."
+    return "Virtual try-on is unavailable for this evaluation."
+
+
 def build_tryon_fallback(
     item: Any,
     error_reason: str = "YouCam service unreachable",
@@ -48,6 +60,7 @@ def build_tryon_fallback(
         neutral default fit values (fit_tightness: 'regular', silhouette: 'relaxed').
     3. In EITHER fallback case, set tryon_degraded: True.
     """
+    friendly_reason = display_tryon_error(error_reason)
     cached_render = getattr(item, "tryon_render_url", None)
     if cached_render and isinstance(cached_render, str):
         logger.warning(
@@ -59,7 +72,7 @@ def build_tryon_fallback(
             "render_url": cached_render,
             "fit_tightness": getattr(item, "fit_tightness", None) or DEFAULT_FALLBACK_FIT_TIGHTNESS,
             "silhouette": getattr(item, "silhouette", None) or DEFAULT_FALLBACK_SILHOUETTE,
-            "notes": f"Degraded fallback: using stale cached render ({error_reason}).",
+            "notes": f"Degraded fallback: using a saved render. {friendly_reason}",
             "cached": True,
             "tryon_degraded": True,
         }
@@ -77,7 +90,7 @@ def build_tryon_fallback(
         "render_url": placeholder_url,
         "fit_tightness": DEFAULT_FALLBACK_FIT_TIGHTNESS,
         "silhouette": DEFAULT_FALLBACK_SILHOUETTE,
-        "notes": f"Degraded fallback: using placeholder render and neutral fit ({error_reason}).",
+        "notes": f"Degraded fallback: using neutral fit signals. {friendly_reason}",
         "cached": False,
         "tryon_degraded": True,
     }
