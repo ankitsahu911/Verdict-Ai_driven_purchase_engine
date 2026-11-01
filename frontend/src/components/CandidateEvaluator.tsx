@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Upload,
   Sparkles,
@@ -18,13 +18,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { NearDuplicateCard } from "@/components/NearDuplicateCard";
-import { VerdictCard } from "@/components/VerdictCard";
+import { LazyVerdictCard } from "@/components/LazyVerdictCard";
 import {
   getAuthToken,
   evaluateCandidate,
   type CandidateEvaluationResult,
   type BuyScoreResultData,
 } from "@/lib/api";
+import {
+  clearEvaluationSession,
+  loadEvaluationSession,
+  saveEvaluationSession,
+} from "@/lib/evaluation-session";
 
 const STAGES = [
   { id: 1, label: "Uploading photo...", icon: Upload },
@@ -127,15 +132,22 @@ export function CandidateEvaluator() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [currentStage, setCurrentStage] = useState<number>(1);
-  const [result, setResult] = useState<CandidateEvaluationResult | null>(SAMPLE_DEMO_RESULT);
+  const [result, setResult] = useState<CandidateEvaluationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = loadEvaluationSession();
+    if (!saved) return;
+    setResult(saved.result);
+    setPrice(saved.price);
+    setPreviewUrl(saved.result.cloudinary_url || null);
+  }, []);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files[0]) {
       const selected = e.target.files[0];
       setFile(selected);
       setPreviewUrl(URL.createObjectURL(selected));
-      setResult(null);
       setError(null);
     }
   }
@@ -145,13 +157,21 @@ export function CandidateEvaluator() {
     setPreviewUrl(null);
     setError(null);
     setResult(SAMPLE_DEMO_RESULT);
+    saveEvaluationSession(SAMPLE_DEMO_RESULT, price);
+  }
+
+  function handleClearSavedResult() {
+    clearEvaluationSession();
+    setFile(null);
+    setPreviewUrl(null);
+    setResult(null);
+    setError(null);
   }
 
   async function handleEvaluate() {
     if (!file) return;
     setLoading(true);
     setError(null);
-    setResult(null);
     setCurrentStage(1);
 
     const timer1 = setTimeout(() => setCurrentStage(2), 1500);
@@ -167,6 +187,8 @@ export function CandidateEvaluator() {
       const numPrice = price ? parseFloat(price) : undefined;
       const res = await evaluateCandidate(file, token, numPrice);
       setResult(res);
+      setPreviewUrl(res.cloudinary_url || previewUrl);
+      saveEvaluationSession(res, price);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Candidate evaluation failed");
     } finally {
@@ -187,15 +209,27 @@ export function CandidateEvaluator() {
               <Shirt className="h-5 w-5 text-neutral-800 dark:text-neutral-200" />
               Add Candidate Garment
             </CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLoadDemo}
-              className="h-10 px-4 text-xs sm:text-sm font-semibold gap-2 border-border bg-card hover:bg-neutral-100 dark:hover:bg-neutral-800 text-foreground cursor-pointer shadow-xs rounded-xl"
-            >
-              <Play className="h-3.5 w-3.5 fill-foreground text-foreground" />
-              Load Sample Evaluated Candidate
-            </Button>
+            <div className="flex items-center gap-2">
+              {result && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClearSavedResult}
+                  className="h-10 px-3 text-xs font-semibold"
+                >
+                  Clear saved result
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLoadDemo}
+                className="h-10 px-4 text-xs sm:text-sm font-semibold gap-2 border-border bg-card hover:bg-neutral-100 dark:hover:bg-neutral-800 text-foreground cursor-pointer shadow-xs rounded-xl"
+              >
+                <Play className="h-3.5 w-3.5 fill-foreground text-foreground" />
+                Load Sample Evaluated Candidate
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-6 space-y-4">
@@ -240,7 +274,7 @@ export function CandidateEvaluator() {
             </Button>
           </div>
 
-          {previewUrl && !result && (
+          {previewUrl && !loading && !result && (
             <div className="relative aspect-video max-h-48 w-full max-w-xs overflow-hidden rounded-xl border bg-muted mx-auto shadow-sm">
               <img
                 src={previewUrl}
@@ -466,7 +500,7 @@ export function CandidateEvaluator() {
 
           {/* Decision Engine Verdict & Recharts 6-Axis Radar Card */}
           <div className="pt-2">
-            <VerdictCard
+            <LazyVerdictCard
               candidateId={result.candidate_item_id}
               initialData={result.candidate_item_id === 101 ? SAMPLE_BUY_SCORE_DEMO : undefined}
             />

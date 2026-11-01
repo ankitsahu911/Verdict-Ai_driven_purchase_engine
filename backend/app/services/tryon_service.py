@@ -84,8 +84,8 @@ def build_tryon_fallback(
 
 
 BASE_URL_V3 = "https://yce-api-01.makeupar.com/s2s/v2.0/task/cloth-v3"
-POLL_INTERVAL_SEC = 3
-MAX_POLL_SEC = 120
+POLL_INTERVAL_SEC = float(os.getenv("YOUCAM_POLL_INTERVAL_SEC", "2"))
+MAX_POLL_SEC = float(os.getenv("YOUCAM_MAX_POLL_SEC", "12"))
 
 
 def generate_tryon(
@@ -123,8 +123,8 @@ def generate_tryon(
         "ref_file_url": garment_url,
     }
 
-    timeout = float(os.getenv("YOUCAM_TIMEOUT_SEC", "15.0"))
-    poll_timeout = float(os.getenv("YOUCAM_POLL_TIMEOUT_SEC", "8.0"))
+    timeout = float(os.getenv("YOUCAM_TIMEOUT_SEC", "8.0"))
+    poll_timeout = float(os.getenv("YOUCAM_POLL_TIMEOUT_SEC", "5.0"))
 
     try:
         resp = requests.post(BASE_URL_V3, json=payload, headers=headers, timeout=timeout)

@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { NavigationHeader } from "@/components/NavigationHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -166,8 +165,6 @@ export default function BlogPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-200">
-      <NavigationHeader currentSubtitle="Editorial Style Guide" badgeText="Curated Advice" />
-
       {/* EXPANSIVE WIDESCREEN CONTAINER — NO SIDE WASTED SPACE, PURE BROWN & WHITE LUXURY PALETTE */}
       <main className="w-full flex-1 py-8 px-4 sm:px-6 lg:px-10 xl:px-14 max-w-[1780px] 2xl:max-w-[1920px] mx-auto space-y-8">
         {/* Header Hero Banner in Warm Cognac Brown & White Palette */}

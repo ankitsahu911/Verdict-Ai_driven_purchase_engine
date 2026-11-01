@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
-import { VerdictConcierge } from "@/components/VerdictConcierge";
+import { DeferredConcierge } from "@/components/DeferredConcierge";
+import { NavigationHeader } from "@/components/NavigationHeader";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,8 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-background text-foreground antialiased selection:bg-neutral-900 selection:text-white">
         <ThemeProvider>
           <AuthProvider>
+            <NavigationHeader />
             {children}
-            <VerdictConcierge />
+            <DeferredConcierge />
           </AuthProvider>
         </ThemeProvider>
       </body>

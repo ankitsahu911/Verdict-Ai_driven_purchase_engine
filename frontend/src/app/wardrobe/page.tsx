@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { NavigationHeader } from "@/components/NavigationHeader";
 import {
   fadeUpVariants,
   staggerContainerVariants,
@@ -76,11 +75,17 @@ function WardrobeContent() {
   const [flashId, setFlashId] = useState<number | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
 
-  const load = useCallback(() => {
-    fetchWardrobe()
-      .then((data) => setItems(Array.isArray(data) ? data : (data as any)?.items || []))
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await fetchWardrobe();
+      setItems(Array.isArray(data) ? data : (data as any)?.items || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load your wardrobe.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -144,8 +149,6 @@ function WardrobeContent() {
 
   return (
     <main className="min-h-screen bg-background pb-16">
-      <NavigationHeader currentSubtitle="Wardrobe Grid" badgeText="Curated Closet" />
-
       <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8">
         <motion.div
           initial="hidden"
@@ -177,8 +180,11 @@ function WardrobeContent() {
         </motion.div>
 
         {error && (
-          <div className="mb-6 rounded-2xl bg-destructive/10 p-4 text-sm text-destructive border border-destructive/20 font-medium">
-            {error}
+          <div className="mb-6 flex flex-col gap-3 rounded-2xl bg-destructive/10 p-4 text-sm text-destructive border border-destructive/20 font-medium sm:flex-row sm:items-center sm:justify-between">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={load} className="w-fit">
+              Retry
+            </Button>
           </div>
         )}
 

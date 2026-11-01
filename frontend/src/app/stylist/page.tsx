@@ -28,7 +28,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { NavigationHeader } from "@/components/NavigationHeader";
 import { fadeUpVariants } from "@/lib/animations";
 import {
   chatWithStylist,
@@ -182,8 +181,6 @@ function StylistChatContent() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col transition-colors duration-200">
-      <NavigationHeader currentSubtitle="Stylist Chat" badgeText="Grounded RAG" />
-
       {/* EXPANSIVE WIDESCREEN CONTAINER — NO SIDE WASTED SPACE, PURE BROWN & WHITE PALETTE */}
       <main className="w-full flex-1 py-8 px-4 sm:px-6 lg:px-10 xl:px-14 max-w-[1780px] 2xl:max-w-[1920px] mx-auto space-y-6 flex flex-col">
         {/* Header Hero Banner in Warm Cognac Brown & White Palette */}

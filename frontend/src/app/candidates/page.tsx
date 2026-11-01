@@ -1,14 +1,11 @@
 "use client";
 
 import { CandidateEvaluator } from "@/components/CandidateEvaluator";
-import { NavigationHeader } from "@/components/NavigationHeader";
 import { Shirt } from "lucide-react";
 
 export default function CandidateEvaluationPage() {
   return (
     <main className="min-h-screen bg-background pb-16">
-      <NavigationHeader currentSubtitle="Candidate Evaluation" badgeText="Orchestrator" />
-
       <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8">
         <div className="border-b pb-6">
           <div className="flex items-center gap-2 text-neutral-600 dark:text-neutral-400 font-bold text-xs uppercase tracking-[0.2em] mb-2">

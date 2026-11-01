@@ -7,10 +7,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { NavigationHeader } from "@/components/NavigationHeader";
 import { fadeUpVariants } from "@/lib/animations";
 import { motion } from "framer-motion";
-import { VerdictCard } from "@/components/VerdictCard";
+import { LazyVerdictCard } from "@/components/LazyVerdictCard";
 import type { BuyScoreResultData } from "@/lib/api";
 
 const DEMO_ITEMS: Record<string, BuyScoreResultData> = {
@@ -211,8 +210,6 @@ export default function VerdictTestPage() {
 
   return (
     <main className="min-h-screen bg-background pb-16">
-      <NavigationHeader currentSubtitle="Verdict Visualizer" badgeText="Decision Engine" />
-
       {/* Main Full-Frame Content */}
       <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8">
         {/* Page Hero Title & Description */}
@@ -289,9 +286,9 @@ export default function VerdictTestPage() {
         {/* Live / Demo Render */}
         <div className="w-full">
           {activeCandidateId ? (
-            <VerdictCard candidateId={activeCandidateId} />
+            <LazyVerdictCard candidateId={activeCandidateId} />
           ) : selectedDemo && DEMO_ITEMS[selectedDemo] ? (
-            <VerdictCard initialData={DEMO_ITEMS[selectedDemo]} />
+            <LazyVerdictCard initialData={DEMO_ITEMS[selectedDemo]} />
           ) : (
             <p className="text-center text-sm text-muted-foreground py-12">
               Select a demo verdict above or enter a Candidate ID to view.

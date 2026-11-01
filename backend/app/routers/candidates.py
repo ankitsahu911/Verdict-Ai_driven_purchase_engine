@@ -24,6 +24,7 @@ from app.models import ExtractionSource, GarmentAttributes, WardrobeItem
 from app.routers.wardrobe import _file_is_allowed, _stream_to_temp, get_or_create_user
 from app.services.chroma_service import find_near_duplicate, upsert_wardrobe_embedding
 from app.services.cloudinary_service import upload_image
+from app.services.duplicate_matching import attribute_duplicate_score
 from app.services.economics_service import (
     calculate_cost_per_wear,
     calculate_return_risk,
@@ -39,6 +40,49 @@ from app.services.vision_service import analyze_image
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/candidates", tags=["candidates"])
+
+PIPELINE_RESPONSE_BUDGET_SEC = float(
+    os.getenv("CANDIDATE_EVALUATION_TIMEOUT_SEC", "12")
+)
+
+
+def _find_attribute_duplicate(
+    candidate_attributes: dict,
+    owner_id: int,
+    db: Session,
+) -> dict | None:
+    """Find a same-category, same-colour closet item missed by visual search."""
+    existing_items = (
+        db.query(WardrobeItem)
+        .filter(
+            WardrobeItem.user_id == owner_id,
+            WardrobeItem.is_candidate == False,
+        )
+        .all()
+    )
+    best_match: dict | None = None
+    for item in existing_items:
+        if not item.attributes:
+            continue
+        score, reason = attribute_duplicate_score(
+            candidate_attributes,
+            {
+                "category": item.attributes.category,
+                "color": item.attributes.color,
+                "pattern": item.attributes.pattern,
+                "style": item.attributes.style,
+                "material": item.attributes.material,
+            },
+        )
+        if score <= 0 or (best_match and score <= best_match["similarity_percentage"]):
+            continue
+        best_match = {
+            "wardrobe_item_id": item.id,
+            "similarity_percentage": score,
+            "distance": round(1.0 - score / 100.0, 3),
+            "metadata": {"attribute_reason": reason},
+        }
+    return best_match
 
 
 @router.get("")
@@ -251,18 +295,73 @@ async def evaluate_candidate_item(
             "embedding_error": emb_error,
         }
 
-    # Dispatch all 3 branches concurrently
+    # Dispatch all 3 branches concurrently. The response has a fixed budget so
+    # an unavailable external provider never freezes the whole screen.
     logger.info(
         "[Candidate Intake] Dispatching concurrent agents (Vision, Try-On, Embedding) for item %s",
         item_id,
     )
-    results = await asyncio.gather(
-        _run_vision_agent(),
-        _run_tryon_agent(),
-        _run_embedding_agent(),
-        return_exceptions=False,
+    vision_task = asyncio.create_task(_run_vision_agent())
+    tryon_task = asyncio.create_task(_run_tryon_agent())
+    embedding_task = asyncio.create_task(_run_embedding_agent())
+    pipeline_deadline = time.perf_counter() + PIPELINE_RESPONSE_BUDGET_SEC
+
+    try:
+        emb_outcome = await asyncio.wait_for(
+            asyncio.shield(embedding_task),
+            timeout=min(8.0, PIPELINE_RESPONSE_BUDGET_SEC),
+        )
+    except asyncio.TimeoutError:
+        embedding_task.cancel()
+        emb_outcome = {
+            "embedding": None,
+            "embedding_error": "Embedding exceeded the response time budget.",
+        }
+
+    # Duplicate search depends only on the embedding, so start it immediately
+    # rather than waiting for vision or virtual try-on to finish.
+    near_dup = None
+    if emb_outcome.get("embedding"):
+        t_dup0 = time.perf_counter()
+        try:
+            near_dup = await asyncio.to_thread(
+                find_near_duplicate,
+                query_embedding=emb_outcome["embedding"],
+                user_id=owner.id,
+                exclude_item_id=item_id,
+            )
+            timings_data["duplicate_detection_ms"] = round(
+                (time.perf_counter() - t_dup0) * 1000.0, 1
+            )
+        except Exception as dup_err:
+            timings_data["duplicate_detection_ms"] = round(
+                (time.perf_counter() - t_dup0) * 1000.0, 1
+            )
+            logger.warning("[Candidate Intake] Duplicate Detection failed: %s", dup_err)
+            errors["duplicate"] = str(dup_err)
+
+    remaining = max(0.0, pipeline_deadline - time.perf_counter())
+    completed, pending = await asyncio.wait(
+        {vision_task, tryon_task},
+        timeout=remaining,
     )
-    vision_outcome, tryon_outcome, emb_outcome = results
+    for task in pending:
+        task.cancel()
+
+    def _task_outcome(task, timeout_error: str) -> dict:
+        if task in completed and not task.cancelled():
+            try:
+                return task.result()
+            except Exception as task_error:
+                return {"success": False, "error": str(task_error)}
+        return {"success": False, "error": timeout_error}
+
+    vision_outcome = _task_outcome(
+        vision_task, "Vision analysis exceeded the response time budget."
+    )
+    tryon_outcome = _task_outcome(
+        tryon_task, "Virtual try-on exceeded the response time budget."
+    )
 
     # -------------------------------------------------------------------------
     # Main-Thread Database Updates (Thread-Safe SQLite Operations)
@@ -331,34 +430,21 @@ async def evaluate_candidate_item(
         candidate_item.tryon_degraded = True
         tryon_res = fallback
 
-    # 3. Category-Aware Duplicate Detection Results
+    # 3. Duplicate Detection Results
     if emb_outcome.get("embedding_error"):
         errors["embedding"] = emb_outcome["embedding_error"]
 
     duplicate_res: dict | None = None
-    near_dup = None
-    if emb_outcome.get("embedding"):
-        t_dup0 = time.perf_counter()
-        try:
-            near_dup = await asyncio.to_thread(
-                find_near_duplicate,
-                query_embedding=emb_outcome["embedding"],
-                user_id=owner.id,
-                exclude_item_id=item_id,
-                category=extracted_category,
-            )
-            dur_dup = (time.perf_counter() - t_dup0) * 1000.0
-            timings_data["duplicate_detection_ms"] = round(dur_dup, 1)
-            logger.info(
-                "[Candidate Intake] Category-aware duplicate detection completed in %.2fs (category: %s)",
-                dur_dup / 1000.0,
-                extracted_category,
-            )
-        except Exception as dup_err:
-            dur_dup = (time.perf_counter() - t_dup0) * 1000.0
-            timings_data["duplicate_detection_ms"] = round(dur_dup, 1)
-            logger.warning("[Candidate Intake] Duplicate Detection failed: %s", dup_err)
-            errors["duplicate"] = str(dup_err)
+
+    attribute_duplicate = None
+    if attributes_res:
+        attribute_duplicate = _find_attribute_duplicate(attributes_res, owner.id, db)
+        if attribute_duplicate and (
+            not near_dup
+            or attribute_duplicate["similarity_percentage"]
+            > near_dup["similarity_percentage"]
+        ):
+            near_dup = attribute_duplicate
     if near_dup:
         matched_id = near_dup["wardrobe_item_id"]
         matched_item = db.query(WardrobeItem).filter(WardrobeItem.id == matched_id).first()
@@ -378,13 +464,17 @@ async def evaluate_candidate_item(
         candidate_item.duplicate_match_item_id = matched_id
         candidate_item.duplicate_similarity_pct = float(pct)
 
+        attribute_reason = near_dup.get("metadata", {}).get("attribute_reason")
         duplicate_res = {
             "wardrobe_item_id": matched_id,
             "cloudinary_url": matched_url,
             "similarity_percentage": pct,
             "distance": near_dup["distance"],
             "category": matched_category,
-            "message": f"{pct}% similar to a {matched_category} you already own",
+            "message": (
+                f"{pct}% similar to a {matched_category} you already own"
+                + (f" ({attribute_reason})" if attribute_reason else "")
+            ),
         }
 
     db.commit()

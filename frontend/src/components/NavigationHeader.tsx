@@ -30,6 +30,19 @@ interface NavigationHeaderProps {
   className?: string;
 }
 
+const ROUTE_META: Record<string, { subtitle: string; badge: string }> = {
+  "/": { subtitle: "Decision Engine", badge: "Enterprise Ready" },
+  "/wardrobe": { subtitle: "Wardrobe Grid", badge: "Curated Closet" },
+  "/candidates": { subtitle: "Candidate Evaluation", badge: "Orchestrator" },
+  "/fitting-room": { subtitle: "Body Measurements & Sizing Studio", badge: "Fit Profile" },
+  "/blog": { subtitle: "Editorial Style Guide", badge: "Curated Advice" },
+  "/verdict-test": { subtitle: "Verdict Visualizer", badge: "Decision Engine" },
+  "/what-if": { subtitle: "What-If Lab", badge: "Cart Optimizer" },
+  "/opportunity-cost": { subtitle: "Opportunity Cost", badge: "Comparison Engine" },
+  "/stylist": { subtitle: "Stylist Chat", badge: "Grounded RAG" },
+  "/dashboard": { subtitle: "Purchase Dashboard", badge: "User Console" },
+};
+
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home },
   { href: "/wardrobe", label: "Wardrobe", icon: Compass },
@@ -52,6 +65,16 @@ export function NavigationHeader({
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
+  const routeMeta = ROUTE_META[pathname] || {
+    subtitle: "Luxury Purchase Engine",
+    badge: "Verdict",
+  };
+  const subtitle = currentSubtitle || routeMeta.subtitle;
+  const badge = badgeText || routeMeta.badge;
+
+  if (pathname === "/login" || pathname === "/signup" || pathname === "/status") {
+    return null;
+  }
 
   function handleLogout() {
     logout();
@@ -66,7 +89,7 @@ export function NavigationHeader({
         {/* Brand Logo & Subtitle */}
         <Link
           href="/"
-          prefetch={true}
+          prefetch
           className="flex items-center gap-2.5 shrink-0 group select-none"
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-neutral-900 text-white font-serif font-bold text-xl shadow-md transition-transform group-hover:scale-105 duration-200 dark:bg-white dark:text-neutral-900">
@@ -77,17 +100,17 @@ export function NavigationHeader({
               <span className="font-serif font-bold text-lg sm:text-xl tracking-tight block text-foreground leading-none">
                 Verdict
               </span>
-              {badgeText && (
+              {badge && (
                 <Badge
                   variant="outline"
                   className="hidden 2xl:inline-flex bg-muted/60 text-foreground border-border text-[10px] font-bold tracking-wider uppercase px-2 py-0.5"
                 >
-                  {badgeText}
+                  {badge}
                 </Badge>
               )}
             </div>
             <span className="text-[10px] text-muted-foreground block font-semibold mt-0.5 tracking-wider uppercase truncate max-w-[140px] sm:max-w-none">
-              {currentSubtitle || "Luxury Purchase Engine"}
+              {subtitle}
             </span>
           </div>
         </Link>
@@ -101,7 +124,7 @@ export function NavigationHeader({
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch={true}
+                prefetch
                 className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold tracking-wide whitespace-nowrap transition-all shrink-0 cursor-pointer ${
                   isActive
                     ? "bg-neutral-900 text-white shadow-sm dark:bg-white dark:text-neutral-900 font-bold"
@@ -136,7 +159,7 @@ export function NavigationHeader({
               </Button>
             </div>
           ) : (
-            <Link href="/login" prefetch={true}>
+            <Link href="/login" prefetch>
               <Button
                 size="sm"
                 className="h-10 px-4 text-xs font-bold rounded-xl bg-neutral-900 text-white hover:bg-black dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100 shadow-sm"

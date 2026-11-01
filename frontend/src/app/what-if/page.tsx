@@ -26,7 +26,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { NavigationHeader } from "@/components/NavigationHeader";
 import {
   fadeUpVariants,
   staggerContainerVariants,
@@ -349,8 +348,6 @@ export default function WhatIfLabPage() {
 
   return (
     <main className="min-h-screen bg-background pb-16">
-      <NavigationHeader currentSubtitle="What-If Lab" badgeText="Cart Optimizer" />
-
       {/* Main Container */}
       <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 space-y-8">
         <motion.div

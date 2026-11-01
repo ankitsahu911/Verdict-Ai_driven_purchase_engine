@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { NavigationHeader } from "@/components/NavigationHeader";
 
 const HERO_TELEMETRY = [
   { label: "Wardrobe Constraint Graph", value: "24 Items", detail: "Locally Vectorized" },
@@ -104,8 +103,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
-      <NavigationHeader currentSubtitle="Decision Engine" badgeText="Enterprise Ready" />
-
       {/* Hero Section — Full Window Width */}
       <section className="relative w-full overflow-hidden pt-12 pb-20 border-b border-border/40">
         <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10">

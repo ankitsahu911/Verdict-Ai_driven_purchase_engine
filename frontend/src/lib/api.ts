@@ -32,7 +32,15 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Network error";
+    throw new Error(
+      `Can't reach the Verdict backend at ${API_URL}. Start the backend and retry. (${detail})`,
+    );
+  }
   if (!res.ok) {
     let detail = "";
     try {

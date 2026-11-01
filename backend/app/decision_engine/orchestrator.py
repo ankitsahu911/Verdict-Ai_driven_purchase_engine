@@ -127,12 +127,14 @@ def synthesize_buy_score(
     overall_score = round(max(0.0, min(100.0, raw_weighted_score)), 1)
     verdict = map_score_to_verdict(overall_score)
 
-    # Duplicate Gating Override: If duplicate overlap is severe (redundancy score <= 15.0),
-    # clamp overall score below the SKIP threshold and enforce SKIP verdict.
+    # Duplicate Gating Override: severe duplicates should never receive a BUY.
     redundancy_axis = next((a for a in axes if a.axis == DecisionAxis.REDUNDANCY), None)
     if redundancy_axis and redundancy_axis.score <= 15.0:
         overall_score = min(overall_score, 42.0)
         verdict = Decision.SKIP.value
+    elif redundancy_axis and redundancy_axis.score <= 25.0 and verdict == Decision.BUY.value:
+        overall_score = min(overall_score, BUY_THRESHOLD - 0.1)
+        verdict = Decision.CONSIDER.value
 
     headline = build_headline_reason(verdict, axes)
 
